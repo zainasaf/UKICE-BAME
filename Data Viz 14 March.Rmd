@@ -1,0 +1,461 @@
+---
+title: "Cleaning Data BAME"
+author: "Zain Asaf"
+date: "2024-03-08"
+output: html_document
+---
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(ggrepel)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# load file ##
+BAME3 <- read_csv("C:/Users/zaina/OneDrive/Documents/UKICE Work/BAME Reprot/Cleaned Data/BAME3.csv")
+
+```
+
+
+```{r}
+## section 1 - who we are ##
+
+identity_lollipop <-BAME3 %>%
+    # check why when attempted filter out NA it didn't work na.omit() #
+ dplyr::select(ethnicity, think_yourself_rank1, think_yourself_rank2, think_yourself_rank3)  
+
+# Calculate the percentage of each identity within each ethnicity group
+identity_lollipop_3 <- identity_lollipop %>%
+  group_by(ethnicity, think_yourself_rank1) %>%
+  summarise(count = n()) %>%
+  mutate(percentage = count / sum(count) * 100) %>%
+  arrange(ethnicity, desc(percentage)) %>%
+  group_by(ethnicity) %>%
+  top_n(3) %>%
+  na.omit() %>%
+  mutate(think_yourself_rank1 = factor(think_yourself_rank1, levels = unique(think_yourself_rank1)))
+
+# Plot the lollipop chart with adjusted plot width
+ggplot(identity_lollipop_3, aes(x = reorder(ethnicity, percentage), y = percentage, fill = think_yourself_rank1)) +
+  geom_segment(aes(xend = reorder(ethnicity, percentage), yend = 0), color = "grey") +
+  geom_point(size = 4, color = "darkblue", shape = 21, position = position_dodge(width = 0.5)) +
+  geom_text(aes(label = paste0(round(percentage), "%")), vjust = -0.5, position = position_dodge(width = 0.5)) +
+  theme_minimal() +
+  #geom_jitter(width = 0.6, height = 0.3) +
+  labs(title = "Top 3 Most Frequent Identities by Ethnicity",
+       x = "Ethnicity",
+       y = "Percentage",
+       fill = "Identity") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+```{r}
+## 2. childdren future ## 
+
+achieve<- BAME3 %>%
+  dplyr::select(ethnicity, children_achieve_ranked_first)
+
+achieve %>% select(ethnicity, children_achieve_ranked_first) %>%
+    group_by(ethnicity, children_achieve_ranked_first) %>%
+    summarize(count = n()) %>%
+    left_join(achieve %>% select(ethnicity, children_achieve_ranked_first) %>%
+                  group_by(ethnicity) %>% 
+                  summarize(count_ethn = n())) %>% 
+    mutate(prop = count / count_ethn) %>%
+    ggplot(aes(x=children_achieve_ranked_first, y=prop, color=ethnicity, group=ethnicity)) +
+    geom_line() +
+    theme_minimal() + 
+  labs(title = "What is the most important thing you want for your children",
+       y= "Proportion",
+       x = "Goals for Children") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```   
+```{r} 
+## 2. childdren future ## 
+### Display 5 ethnic groups on one plot and 4 on another  ### 
+## all asian categories on one and all black on the other ## 
+
+  asian_achieve <- achieve %>% filter(ethnicity %in% c("Asian / Asian British: Other", 
+                          "Asian / Asian British: Pakistani", 
+                          "Asian / Asian British: Indian",
+                          "Asian / Asian British: Bangladeshi", 
+                          "Asian / Asian British: Chinese")) %>% 
+  select(children_achieve_ranked_first, ethnicity)
+
+
+
+asian_achieve %>% select(ethnicity, children_achieve_ranked_first) %>%
+    group_by(ethnicity, children_achieve_ranked_first) %>%
+    summarize(count = n()) %>%
+    left_join(achieve %>% select(ethnicity, children_achieve_ranked_first) %>%
+                  group_by(ethnicity) %>% 
+                  summarize(count_ethn = n())) %>% 
+    mutate(prop = count / count_ethn) %>%
+    ggplot(aes(x=children_achieve_ranked_first, y=prop, color=ethnicity, group=ethnicity)) +
+    geom_line() +
+    theme_minimal() + 
+  labs(title = "What is the most important thing you want for your children",
+       y= "Proportion",
+       x = "Goals for Children") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+   
+```
+```{r}
+## children - futrue ## 
+## black ## 
+
+  black_achieve <- achieve %>% filter(ethnicity %in% c("Black / Black British: African", 
+                          "Black / Black British: Other", 
+                          "Black / Black British: Carribean",
+                          "Arab",
+                          "Any other group",
+                          "Mixed or multiple ethnic groups")) %>% 
+  select(children_achieve_ranked_first, ethnicity)
+
+
+
+black_achieve %>% select(ethnicity, children_achieve_ranked_first) %>%
+    group_by(ethnicity, children_achieve_ranked_first) %>%
+    summarize(count = n()) %>%
+    left_join(achieve %>% select(ethnicity, children_achieve_ranked_first) %>%
+                  group_by(ethnicity) %>% 
+                  summarize(count_ethn = n())) %>% 
+    mutate(prop = count / count_ethn) %>%
+    ggplot(aes(x=children_achieve_ranked_first, y=prop, color=ethnicity, group=ethnicity)) +
+    geom_line() +
+    theme_minimal() + 
+  labs(title = "What is the most important thing you want for your children",
+       y= "Proportion",
+       x = "Goals for Children") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+
+
+```{r} 
+## child rearing -respect for elders v independence ## 
+## Dot plot ## 
+## remove don't know
+children_respect1 <- BAME3 %>%
+  select(ethnicity, children_respect_independence) %>%
+  filter(children_respect_independence != "Don't know" & 
+         children_respect_independence != "Don‚Äôt know")
+
+
+children_respect2 <- children_respect1 %>%
+select(ethnicity, children_respect_independence ) %>%
+  group_by(ethnicity)
+
+ children_respect2 %>% count(children_respect_independence, sort=TRUE)
+ 
+ children_respect3 <- children_respect2 %>%
+  group_by(ethnicity, children_respect_independence) %>%
+  summarise(count = n()) %>%  
+  group_by(ethnicity) %>%
+  mutate(percentage = count / sum(count) * 100)
+
+ggplot(children_respect3, aes(ethnicity, percentage)) +
+  geom_point(aes(color = children_respect_independence)) +
+  scale_color_manual(values = c("Respect for elders" = "blue", "Independence" = "red")) +
+  theme_minimal() +
+  labs(title = "Do you think it is more important for your children to respect elders or be independent",
+       x = "Ethnicity",
+       y = "Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = NULL))
+
+```
+ 
+
+``` {r}
+## child rearing - self-reliance v obedience (q.34) ##
+
+## Dot plot ## 
+## remove don't know
+children_obedience1 <- BAME3 %>%
+  select(ethnicity, children_obedience_selfreliance) %>%
+  filter(children_obedience_selfreliance != "Don't know" & 
+         children_obedience_selfreliance != "Don‚Äôt know")
+
+
+children_obedience2 <- children_obedience1 %>%
+select(ethnicity, children_obedience_selfreliance) %>%
+  group_by(ethnicity)
+
+ 
+ children_obedience3 <- children_obedience2 %>%
+  group_by(ethnicity, children_obedience_selfreliance) %>%
+  summarise(count = n()) %>%  
+  group_by(ethnicity) %>%
+  mutate(percentage = count / sum(count) * 100)
+
+ children_obedience3 %>% count(children_obedience_selfreliance, sort=TRUE)
+ 
+ggplot(children_obedience3, aes(ethnicity, percentage)) +
+  geom_point(aes(color = children_obedience_selfreliance)) +
+  scale_color_manual(values = c("Obedience" = "blue", "Self-reliance" = "red")) +
+  theme_minimal() +
+  labs(title = "Do you think it is more important for your children to be obedient or self-reliant",
+       x = "Ethnicity",
+       y = "Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = NULL))
+
+```   
+
+
+
+
+
+```{r}
+## child rearing - considertate v well behaved (q.35) #
+
+
+
+## Dot plot ## 
+## remove don't know
+children_considerate1 <- BAME3 %>%
+  select(ethnicity, children_considerate_behaved) %>%
+  filter(children_considerate_behaved != "Don't know" & 
+         children_considerate_behaved != "Don‚Äôt know")
+
+children_considerate2 <- children_considerate1 %>%
+select(ethnicity, children_considerate_behaved) %>%
+  group_by(ethnicity)
+
+ 
+ children_considerate3 <- children_considerate2 %>%
+  group_by(ethnicity, children_considerate_behaved) %>%
+  summarise(count = n()) %>%  
+  group_by(ethnicity) %>%
+  mutate(percentage = count / sum(count) * 100)
+
+ children_considerate3 %>% count(children_considerate_behaved, sort=TRUE)
+ 
+ggplot(children_considerate3, aes(ethnicity, percentage)) +
+  geom_point(aes(color = children_considerate_behaved)) +
+  scale_color_manual(values = c("To be well-behaved" = "blue", "To be considerate" = "red")) +
+  theme_minimal() +
+  labs(title = "Do you think it is more important for your children to be well-behaved or considerate",
+       x = "Ethnicity",
+       y = "Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = NULL))
+
+```
+
+```{r}
+## child-rearing - curiosity v good manners (q.36)
+
+## Dot plot ## 
+## remove don't know
+children_curiosity1 <- BAME3 %>%
+  select(ethnicity, children_curiosity_goodmanners) %>%
+  filter(children_curiosity_goodmanners != "Don't know" & 
+         children_curiosity_goodmanners != "Don‚Äôt know")
+
+children_curiosity2 <- children_curiosity1 %>%
+select(ethnicity, children_curiosity_goodmanners) %>%
+  group_by(ethnicity)
+
+ 
+ children_curiosity3 <- children_curiosity2 %>%
+  group_by(ethnicity, children_curiosity_goodmanners) %>%
+  summarise(count = n()) %>%  
+  group_by(ethnicity) %>%
+  mutate(percentage = count / sum(count) * 100)
+
+ children_curiosity3 %>% count(children_curiosity_goodmanners, sort=TRUE)
+ 
+ggplot(children_curiosity3, aes(ethnicity, percentage)) +
+  geom_point(aes(color = children_curiosity_goodmanners)) +
+  scale_color_manual(values = c("Good manners" = "blue", "Curiosity" = "red")) +
+  theme_minimal() +
+  labs(title = "Do you think it is more important for your children to be curious or have good manners",
+       x = "Ethnicity",
+       y = "Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = NULL))
+```
+
+
+
+
+```{r}
+## values ## 
+
+## create index of econoomic values ## 
+## lower values more left wing ##
+## see if there is a way to keep the NAs in the calculation but then drop them from the plot ##
+BAME3<- BAME3 %>%
+  mutate( 
+    position_society_effort2 = case_when(
+      position_society_effort == "A person‚Äôs position in society is mostly the result of elements outside their control" ~ 0,
+      position_society_effort == "A person‚Äôs position in society is mostly the result of individual effort" ~1,
+      position_society_effort == "Don't know" ~ NA_real_,
+      TRUE ~ as.numeric(position_society_effort)
+))
+BAME3<-BAME3 %>%
+  mutate(
+    econgrowth_equality2 = case_when(
+      econgrowth_equality == "The Government should focus on growing the size of the UK‚Äôs economy more than they should on sharing out wealth more equally" ~ 1, 
+      econgrowth_equality == "The Government should focus on sharing out wealth more equally than they should on growing the size of the economy" ~0,
+      econgrowth_equality == "Don't know" ~ NA_real_,
+      TRUE ~ as.numeric(econgrowth_equality)
+))
+
+BAME3<-BAME3 %>%
+  mutate(
+   gvmt_benefits2 = case_when(
+     gvmt_benefits == "People who are struggling to get by have a right to seek help from the Government" ~0, 
+     gvmt_benefits == "Government benefits are too readily available to people who have never contributed anything in return" ~ 1, 
+     gvmt_benefits == "Don't know" ~ NA_real_,
+     TRUE ~ as.numeric(gvmt_benefits)
+))
+
+BAME3<-BAME3 %>% 
+  mutate(
+    redistribution2 = case_when(
+      redistribution == "The Government should redistribute income from the better-off to those who are less well-off" ~ 0,
+      redistribution == "The Government should not redistribute income as people have a right to decide what to do with their own money" ~1,
+      redistribution == "Don't know" ~ NA_real_,
+      TRUE ~ as.numeric(redistribution)
+))
+
+## create econ index ##
+
+BAME3$econ_index<-(BAME3$redistribution2+BAME3$gvmt_benefits2+BAME3$econgrowth_equality2 +BAME3$position_society_effort2) 
+
+
+econ_index_2<-BAME3 %>% select(ethnicity, econ_index)
+
+econ_index_2 <- BAME3 %>%
+  select(ethnicity, econ_index)
+
+econ_index_3 <- econ_index_2 %>%
+  group_by(ethnicity) %>%
+  summarize(mean_econ_index = mean(econ_index, na.rm = TRUE))
+
+ ggplot(econ_index_3, aes(ethnicity, mean_econ_index)) +
+   geom_point(aes(color = children_respect_independence), size = 3, color = "red") + 
+   theme_minimal() +
+  labs(title = "Left-Right Economic Values of Ethnic Minorities",
+       x = "Ethnicity",
+       y = "Left-Right Economic Scale") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ 
+```
+
+
+```{r}
+
+## create alternative economic index - binary 0 where those who are hvae total score of less than or equal to 2 are classified as "left" and  those 3/4 right##
+
+econ_index_binary <- econ_index_2 %>%
+  mutate(econ_category = ifelse(econ_index <= 2, "Left", "Right")) %>%
+  na.omit() %>%
+  group_by(ethnicity, econ_category) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum(count) * 100)
+
+econ_index_binary %>%
+  ggplot(aes(ethnicity, proportion)) +
+  geom_point(aes(color = econ_category)) +
+  scale_color_manual(values = c("Left" = "red", "Right" = "blue"),
+                     labels = c("Left" = "Left", "Right" = "Right")) +
+  theme_minimal() +
+  labs(title = "Left-Right Economic Values of Ethnic Minorities",
+       x = "Ethnicity",
+       y = "Left-Right") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = "Economic Values"))
+
+  
+```
+```{r}
+## create alternative cultrual index - binary 0 where those who are hvae total score of less than or equal to 2 are classified as "left" and  those 3/4 right##
+
+## values ## 
+
+## create index of culture values ## 
+## lower values more left wing ##
+## see if there is a way to keep the NAs in the calculation but then drop them from the plot ##
+BAME3<- BAME3 %>%
+  mutate( 
+    immigration2 = case_when(
+    immigration == "Immigration has enriched British culture and society" ~ 0,
+    immigration == "Immigration has undermined British culture and society" ~1, 
+    immigration == "Don't know" ~ NA_real_,
+      TRUE ~ as.numeric(immigration)
+))
+BAME3<- BAME3 %>%
+  mutate(
+    lgbtq_rights2 = case_when(
+    lgbtq_rights == "LGBTQ+ rights have not gone far enough" ~ 0, 
+     lgbtq_rights == "LGBTQ+ rights in this country have gone too far" ~1,
+      lgbtq_rights == "Don't know" ~ NA_real_,
+      TRUE ~ as.numeric(lgbtq_rights)
+))
+
+BAME3<- BAME3 %>%
+  mutate(
+    crime2 = case_when(
+      crime == "People turn to crime because they have no other option and it is the only route available to them to better their lives" ~ 0,
+      crime == "People who commit crimes do so because they‚Äôre fundamentally bad people" ~ 1, 
+      crime == "Don't know" ~ NA_real_,
+      TRUE ~ as.numeric(crime)
+))
+
+      
+  BAME3<- BAME3 %>% 
+    mutate(
+      overseas_aid2 = case_when(
+        overseas_aid == "The UK should increase spending on overseas aid to other countries" ~ 0, 
+        overseas_aid == "The UK should cut spending on overseas aid to other countries" ~ 1,
+        overseas_aid == "Don't know" ~ NA_real_,
+        TRUE ~ as.numeric(overseas_aid)
+))
+```
+
+```{r}
+
+BAME3$culture_index <- (BAME3$immigration2 + BAME3$lgbtq_rights2 + BAME3$crime2 + BAME3$overseas_aid2)
+
+culture_index_binary <- BAME3 %>% dplyr:: select(culture_index, ethnicity) %>%
+  mutate(culture_category = ifelse(culture_index <= 2, "Left", "Right")) %>%
+  na.omit() %>%
+  group_by(ethnicity, culture_category) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum(count) * 100)
+
+culture_index_binary %>%
+  ggplot(aes(ethnicity, proportion)) +
+  geom_point(aes(color = culture_category)) +
+  scale_color_manual(values = c("Left" = "red", "Right" = "blue"),
+                     labels = c("Left" = "Left", "Right" = "Right")) +
+  theme_minimal() +
+  labs(title = "Left-Right Socio-cultural Values of Ethnic Minorities",
+       x = "Ethnicity",
+       y = "Left-Right") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = "Socio-cultural Values"))
+
+
+```
+```{r} 
+## Do cultural and economic values - by BAME generation and BAME cohort ##
+```
+```
+```{r}
+
+uk_gvmt <- BAME3 %>% 
+    dplyr::select(ethnicity, instituions_uk_gvmt)  %>%
+group_by(ethnicity, instituions_uk_gvmt) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum(count) * 100)
+
