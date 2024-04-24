@@ -1,0 +1,4904 @@
+---
+title: "Cleaning Data BAME"
+author: "Zain Asaf"
+date: "2024-03-08"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(ggrepel)
+library(stringr)
+library(ggeffects)
+library(modelsummary)
+#install.packages("FactoMineR")
+library("FactoMineR")
+#install.packages("factoextra")
+library(factoextra)
+#install.packages("dslabs")
+#library(dslabs)
+knitr::opts_chunk$set(echo = FALSE)
+
+```
+
+
+
+
+```{r}
+# load file ##
+BAME3 <- read_csv("C:/Users/zaina/OneDrive/Documents/UKICE Work/BAME Reprot/Cleaned Data/BAME_April_23.csv")
+#BAME3 <- read_csv("C:/Users/MaazPC/Documents/Zainwork/April(9).csv")
+
+genpop_April_20 <- read_csv("C:/Users/zaina/OneDrive/Documents/UKICE Work/BAME Reprot/Cleaned Data/(April23_genpop).csv")
+#genpop_April_12_ <- read_csv("C:/Users/MaazPC/Documents/Zainwork/genpop(April_12).csv")
+genpop <- genpop_April_20
+
+# Apr 12
+# setdiff(colnames(BAME3), colnames(white))
+# look at these columns
+#[1] "born_uk"                        "family_long_uk"                
+#[3] "institutions_welsh_gvmt"        "leader_scale_javid_selection"  
+#[5] "leader_scale_starmer_selection" "leader_scale_johnson_selection"
+
+## merge white responsents with BAME3 usining ethnicity
+
+for (col in colnames(BAME3)) {
+    if (col %in% colnames(genpop)) {
+        # Determine the class of the column in BAME3
+        target_class <- class(BAME3[[col]])
+        
+        # Convert the genpop column to the target class
+        # We check for common data types and convert accordingly
+        if (target_class == "factor") {
+            genpop[[col]] <- as.factor(genpop[[col]])
+        } else if (target_class == "numeric") {
+            genpop[[col]] <- as.numeric(genpop[[col]])
+        } else if (target_class == "integer") {
+            genpop[[col]] <- as.integer(genpop[[col]])
+        } else if (target_class == "character") {
+            genpop[[col]] <- as.character(genpop[[col]])
+        }
+    }
+}
+
+
+BAME3 <- bind_rows(BAME3, genpop)
+
+# Check the dimensions of the merged data frame
+dim(BAME3)
+
+## remove .x from the variable names of merged data set 
+
+names(BAME3) <- gsub("\\.x", "", names(BAME3))
+
+
+
+
+```
+
+
+```{r}
+## section 1 - who we are ##
+
+identity_lollipop <-BAME3 %>%
+    # check why when attempted filter out NA it didn't work na.omit() #
+ dplyr::select(ethnicity, think_yourself_rank1, think_yourself_rank2, think_yourself_rank3)  
+
+# Calculate the percentage of each identity within each ethnicity group
+identity_lollipop_3 <- identity_lollipop %>%
+  group_by(ethnicity, think_yourself_rank1) %>%
+  summarise(count = n()) %>%
+  mutate(percentage = count / sum(count) * 100) %>%
+  arrange(ethnicity, desc(percentage)) %>%
+  group_by(ethnicity) %>%
+  top_n(3) %>%
+  na.omit() %>%
+  mutate(think_yourself_rank1 = factor(think_yourself_rank1, levels = unique(think_yourself_rank1)))
+
+# Plot the lollipop chart with adjusted plot width
+ggplot(identity_lollipop_3, aes(x = reorder(ethnicity, percentage), y = percentage, fill = think_yourself_rank1)) +
+  geom_segment(aes(xend = reorder(ethnicity, percentage), yend = 0), color = "grey") +
+  geom_point(size = 4, color = "darkblue", shape = 21, position = position_dodge(width = 0.5)) +
+  geom_text(aes(label = paste0(round(percentage), "%")), vjust = -0.5, position = position_dodge(width = 0.5)) +
+  theme_minimal() +
+  #geom_jitter(width = 0.6, height = 0.3) +
+  labs(title = "Top 3 Most Frequent Identities by Ethnicity",
+       x = "Ethnicity",
+       y = "Percentage",
+       fill = "Identity") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+## idenitity by age ## lolipop ranking #
+
+## section 1 - who we are ##
+
+identity_age <- BAME3 %>%
+ dplyr::select(age, ethnicity, think_yourself_rank1, think_yourself_rank2, think_yourself_rank3)%>%
+  filter(!ethnicity=="White")
+
+
+# Calculate the percentage of each identity within each ethnicity group
+identity_age_3 <- identity_age %>%
+  group_by(age, think_yourself_rank1) %>%
+  summarise(count = n()) %>%
+  mutate(percentage = count / sum(count) * 100) %>%
+  arrange(age, desc(percentage)) %>%
+  group_by(age) %>%
+  top_n(3) %>%
+  na.omit() %>%
+  mutate(think_yourself_rank1 = factor(think_yourself_rank1, levels = unique(think_yourself_rank1)))
+
+# Plot the lollipop chart with adjusted plot width
+ggplot(identity_age_3, aes(x = reorder(age, percentage), y = percentage, fill = think_yourself_rank1)) +
+  geom_segment(aes(xend = reorder(age, percentage), yend = 0), color = "grey") +
+  geom_point(size = 4, color = "darkblue", shape = 21, position = position_dodge(width = 0.5)) +
+  geom_text(aes(label = paste0(round(percentage), "%")), vjust = -0.5, position = position_dodge(width = 0.5)) +
+  theme_minimal() +
+  #geom_jitter(width = 0.6, height = 0.3) +
+  labs(title = "Top 3 Most Frequent Identities by Age Groups",
+       x = "Age",
+       y = "Percentage",
+       fill = "Identity") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+## age ## 
+## idenitity by generation ## lolipop ranking #
+
+## section 1 - who we are ##
+
+identity_generation <- BAME3 %>%
+  dplyr::select(time_uk, ethnicity, think_yourself_rank1, think_yourself_rank2, think_yourself_rank3) %>%
+  filter(!ethnicity=="White") 
+
+
+identity_generation_1 <-identity_generation %>%
+    filter(time_uk %in% c("More than five years and less than ten years", 
+                          "Less than a year", 
+                          "More than forty years",
+                          "More than ten years and less than twenty years", 
+                          "More than two years and less than five years",
+                          "More than a year and less than two years",
+                          "More than twenty years and less than forty years"))  
+
+ 
+
+# Calculate the percentage of each identity within each generation
+identity_generation_2 <- identity_generation_1 %>%
+  group_by(time_uk, think_yourself_rank1) %>%
+  summarise(count = n()) %>%
+  mutate(percentage = count / sum(count) * 100) %>%
+  arrange(time_uk, desc(percentage)) %>%
+  group_by(time_uk) %>%
+  top_n(3) %>%
+  na.omit() %>%
+  mutate(think_yourself_rank1 = factor(think_yourself_rank1, levels = unique(think_yourself_rank1)))
+
+# Plot the lollipop chart with adjusted plot width
+#ggplot(identity_generation_2, aes(x = reorder(time_uk, percentage), y = percentage, fill = think_yourself_rank1)) +
+#  geom_segment(aes(xend = reorder(time_uk, percentage), yend = 0), color = "grey") +
+#  geom_point(size = 4, color = "darkblue", shape = 21, position = position_dodge(width = 0.5)) +
+ # geom_text(aes(label = paste0(round(percentage), "%")), vjust = -0.5, position = position_dodge(width = 0.5)) +
+#  theme_minimal() +
+  #geom_jitter(width = 0.6, height = 0.3) +
+ # labs(title = "Top 3 Most Frequent Identities by Generation",
+  #     x = "Ethnicity",
+   #    y = "Percentage",
+    #   fill = "Identity") +
+  #theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+## version with axis not hjust
+
+ggplot(identity_generation_2, aes(x = reorder(time_uk, percentage), y = percentage, fill = think_yourself_rank1)) +
+  geom_segment(aes(xend = reorder(time_uk, percentage), yend = 0), color = "grey") +
+  geom_point(size = 4, color = "darkblue", shape = 21, position = position_dodge(width = 0.5)) +
+  geom_text_repel(aes(label = paste0(round(percentage), "%")), vjust = -0.5, position = position_dodge(width = 0.5)) +
+  theme_minimal() +
+  #geom_jitter(width = 0.6, height = 0.3) +
+  labs(title = "Top 3 Most Frequent Identities by Generation",
+       x = "Time in UK",
+       y = "Percentage",
+       fill = "Identity") +
+  theme(axis.text.x = element_text(angle = 0, hjust = 1)) +
+  scale_x_discrete(labels=function(x){str_wrap(x,12)})
+
+```
+
+```{r}
+## 2. childdren future ## 
+
+achieve<- BAME3 %>%
+  dplyr::select(ethnicity, children_achieve_ranked_first, time_uk)
+
+achieve %>% select(ethnicity, children_achieve_ranked_first) %>%
+    group_by(ethnicity, children_achieve_ranked_first) %>%
+    summarize(count = n()) %>%
+    left_join(achieve %>% select(ethnicity, children_achieve_ranked_first) %>%
+                  group_by(ethnicity) %>% 
+                  summarize(count_ethn = n())) %>% 
+    mutate(prop = count / count_ethn) %>%
+    ggplot(aes(x=children_achieve_ranked_first, y=prop, color=ethnicity, group=ethnicity)) +
+    geom_line() +
+    theme_minimal() + 
+  labs(title = "What is the most important thing you want for your children",
+       y= "Proportion",
+       x = "Goals for Children") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```   
+
+```{r} 
+## 2. childdren future ## 
+### Display 5 ethnic groups on one plot and 4 on another  ### 
+## all asian categories on one and all black on the other ## 
+
+ asian_achieve <- achieve %>%
+  filter(ethnicity %in% c("Asian / Asian British: Other", 
+                          "Asian / Asian British: Pakistani", 
+                          "Asian / Asian British: Indian",
+                          "Asian / Asian British: Bangladeshi", 
+                          "Asian / Asian British: Chinese")) %>%
+  select(children_achieve_ranked_first, ethnicity, time_uk)
+
+asian_achieve %>%
+  filter(!is.na(children_achieve_ranked_first)) %>% # Remove rows with NA in children_achieve_ranked_first
+  select(ethnicity, children_achieve_ranked_first) %>%
+  group_by(ethnicity, children_achieve_ranked_first) %>%
+  summarize(count = n()) %>%
+  left_join(achieve %>%
+              select(ethnicity, children_achieve_ranked_first) %>%
+              group_by(ethnicity) %>% 
+              summarize(count_ethn = n())) %>% 
+  mutate(prop = count / count_ethn) %>%
+  ggplot(aes(x = children_achieve_ranked_first, y = prop, color = ethnicity, group = ethnicity)) +
+  geom_line() +
+  theme_minimal() + 
+  labs(title = "What is the most important thing you want for your children",
+       y = "Proportion",
+       x = "Goals for Children") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+asian_achieve <- achieve %>%
+  filter(ethnicity %in% c("Asian / Asian British: Other", 
+                          "Asian / Asian British: Pakistani", 
+                          "Asian / Asian British: Indian",
+                          "Asian / Asian British: Bangladeshi", 
+                          "Asian / Asian British: Chinese")) %>%
+  select(children_achieve_ranked_first, ethnicity)
+
+asian_achieve %>%
+  filter(!is.na(children_achieve_ranked_first)) %>% # Remove rows with NA in children_achieve_ranked_first
+  select(ethnicity, children_achieve_ranked_first) %>%
+  group_by(ethnicity, children_achieve_ranked_first) %>%
+  summarize(count = n()) %>%
+  left_join(achieve %>%
+              select(ethnicity, children_achieve_ranked_first) %>%
+              group_by(ethnicity) %>% 
+              summarize(count_ethn = n())) %>% 
+  mutate(prop = count / count_ethn) %>%
+  ggplot(aes(x = children_achieve_ranked_first, y = prop, color = ethnicity, group = ethnicity)) +
+  geom_line() +
+  theme_minimal() + 
+  labs(title = "What is the most important thing you want for your children",
+       y = "Proportion",
+       x = "Goals for Children") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+
+
+
+
+```{r}
+## children - futrue ## 
+## black ## 
+
+  black_achieve <- achieve %>% filter(ethnicity %in% c("Black / Black British: African", 
+                          "Black / Black British: Other", 
+                          "Black / Black British: Carribean",
+                          "Arab",
+                          "Any other group",
+                          "White",
+                          "Mixed or multiple ethnic groups")) %>% 
+  select(children_achieve_ranked_first, ethnicity)
+
+
+
+black_achieve %>% 
+   filter(!is.na(children_achieve_ranked_first)) %>%
+     select(ethnicity, children_achieve_ranked_first) %>%
+    group_by(ethnicity, children_achieve_ranked_first) %>%
+    summarize(count = n()) %>%
+    left_join(achieve %>% select(ethnicity, children_achieve_ranked_first) %>%
+                  group_by(ethnicity) %>% 
+                  summarize(count_ethnicity = n())) %>% 
+    mutate(prop = count / count_ethnicity) %>%
+    ggplot(aes(x=children_achieve_ranked_first, y=prop, color=ethnicity, group=ethnicity)) +
+    geom_line() +
+    theme_minimal() + 
+  labs(title = "What is the most important thing you want for your children",
+       y= "Proportion",
+       x = "Goals for Children") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+
+```{r}
+
+
+
+
+
+
+
+
+``` {r}
+#Most important thing for children by genderation##
+
+## children - want ot acieve ## 
+##  ## 
+
+ children_achieve_generation_1 <- achieve %>%
+  dplyr::select(time_uk, children_achieve_ranked_first, ethnicity)%>%
+  filter(!ethnicity=="White")
+
+children_achieve_generation_2 <-children_achieve_generation_1 %>%
+    filter(time_uk %in% c("More than five years and less than ten years", 
+                          "Less than a year", 
+                          "More than forty years",
+                          "More than ten years and less than twenty years", 
+                          "More than two years and less than five years",
+                          "More than a year and less than two years",
+                          "More than twenty years and less than forty years"))  
+
+ 
+# Calculate the percentage of each identity within each generation
+children_achieve_generation_3 <- children_achieve_generation_2 %>%
+  group_by(time_uk, children_achieve_ranked_first) %>%
+  summarise(count = n()) %>%
+  mutate(percentage = count / sum(count) * 100) %>%
+  arrange(time_uk, desc(percentage)) %>%
+  group_by(time_uk) %>%
+  top_n(3) %>%
+  na.omit() %>%
+  mutate(think_yourself_rank1 = factor(think_yourself_rank1, levels = unique(think_yourself_rank1)))
+
+ggplot(identity_generation_2,  aes(x= time_uk, y=percentage, color=think_yourself_rank1, group=time_uk)) +
+    geom_line() +
+    theme_minimal() + 
+  labs(title = "What is the most important thing you want for your children",
+       y= "Percentage",
+       x = "Time in UK") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+
+```{r} 
+## Q3.  CHILD REARING 
+## child rearing -respect for elders v independence ## 
+## Dot plot ## 
+## remove don't know
+children_respect1 <- BAME3 %>%
+  select(ethnicity, children_respect_independence) %>%
+  filter(children_respect_independence != "Don't know" & 
+         children_respect_independence != "Don‚Äôt know")
+
+
+children_respect2 <- children_respect1 %>%
+select(ethnicity, children_respect_independence ) %>%
+  group_by(ethnicity)
+
+ children_respect2 %>% count(children_respect_independence, sort=TRUE)
+ 
+ children_respect3 <- children_respect2 %>%
+  group_by(ethnicity, children_respect_independence) %>%
+  summarise(count = n()) %>%  
+  group_by(ethnicity) %>%
+  mutate(percentage = count / sum(count) * 100)
+
+ggplot(children_respect3, aes(ethnicity, percentage)) +
+  geom_point(aes(color = children_respect_independence)) +
+  scale_color_manual(values = c("Respect for elders" = "blue", "Independence" = "red")) +
+  theme_minimal() +
+  labs(title = "Do you think it is more important for your children to respect elders or be independent",
+       x = "Ethnicity",
+       y = "Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = NULL))
+
+```
+ 
+
+``` {r}
+## child rearing - self-reliance v obedience (q.34) ##
+
+## Dot plot ## 
+## remove don't know
+children_obedience1 <- BAME3 %>%
+  select(ethnicity, children_obedience_selfreliance) %>%
+  filter(!(children_obedience_selfreliance %in% c("Don't know", "Don‚Äôt know")))
+
+children_obedience2 <- children_obedience1 %>%
+select(ethnicity, children_obedience_selfreliance) %>%
+  group_by(ethnicity)
+
+ 
+ children_obedience3 <- children_obedience2 %>%
+  group_by(ethnicity, children_obedience_selfreliance) %>%
+  summarise(count = n()) %>%  
+  group_by(ethnicity) %>%
+  mutate(percentage = count / sum(count) * 100)
+
+ children_obedience3 %>% count(children_obedience_selfreliance, sort=TRUE)
+ 
+ggplot(children_obedience3, aes(ethnicity, percentage)) +
+  geom_point(aes(color = children_obedience_selfreliance)) +
+  scale_color_manual(values = c("Obedience" = "blue", "Self-reliance" = "red")) +
+  theme_minimal() +
+  labs(title = "Do you think it is more important for your children to be obedient or self-reliant",
+       x = "Ethnicity",
+       y = "Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = NULL))
+
+```   
+
+
+
+
+
+```{r}
+## child rearing - considertate v well behaved (q.35) #
+
+
+
+## Dot plot ## 
+## remove don't know
+children_considerate1 <- BAME3 %>%
+  select(ethnicity, children_considerate_behaved) %>%
+  filter(children_considerate_behaved != "Don't know" & 
+         children_considerate_behaved != "Don‚Äôt know")
+
+children_considerate2 <- children_considerate1 %>%
+select(ethnicity, children_considerate_behaved) %>%
+  group_by(ethnicity)
+
+ 
+ children_considerate3 <- children_considerate2 %>%
+  group_by(ethnicity, children_considerate_behaved) %>%
+  summarise(count = n()) %>%  
+  group_by(ethnicity) %>%
+  mutate(percentage = count / sum(count) * 100)
+
+ children_considerate3 %>% count(children_considerate_behaved, sort=TRUE)
+ 
+ggplot(children_considerate3, aes(ethnicity, percentage)) +
+  geom_point(aes(color = children_considerate_behaved)) +
+  scale_color_manual(values = c("To be well-behaved" = "blue", "To be considerate" = "red")) +
+  theme_minimal() +
+  labs(title = "Do you think it is more important for your children to be well-behaved or considerate",
+       x = "Ethnicity",
+       y = "Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = NULL))
+
+```
+
+```{r}
+## child-rearing - curiosity v good manners (q.36)
+
+## Dot plot ## 
+## remove don't know
+children_curiosity1 <- BAME3 %>%
+  select(ethnicity, children_curiosity_goodmanners) %>%
+  filter(children_curiosity_goodmanners != "Don't know" & 
+         children_curiosity_goodmanners != "Don‚Äôt know")
+
+children_curiosity2 <- children_curiosity1 %>%
+select(ethnicity, children_curiosity_goodmanners) %>%
+  group_by(ethnicity)
+
+ 
+ children_curiosity3 <- children_curiosity2 %>%
+  group_by(ethnicity, children_curiosity_goodmanners) %>%
+  summarise(count = n()) %>%  
+  group_by(ethnicity) %>%
+  mutate(percentage = count / sum(count) * 100)
+
+ children_curiosity3 %>% count(children_curiosity_goodmanners, sort=TRUE)
+ 
+ggplot(children_curiosity3, aes(ethnicity, percentage)) +
+  geom_point(aes(color = children_curiosity_goodmanners)) +
+  scale_color_manual(values = c("Good manners" = "blue", "Curiosity" = "red")) +
+  theme_minimal() +
+  labs(title = "Do you think it is more important for your children to be curious or have good manners",
+       x = "Ethnicity",
+       y = "Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = NULL))
+```
+
+
+
+
+```{r}
+## Q4. VALUES
+## values ## 
+
+## create index of econoomic values ## 
+## lower values more left wing ##
+## see if there is a way to keep the NAs in the calculation but then drop them from the plot ##
+BAME3 <- BAME3 %>%
+  mutate( 
+    position_society_effort2 = case_when(
+      position_society_effort == "A person‚Äôs position in society is mostly the result of elements outside their control" ~ 0,
+      position_society_effort == "A person’s position in society is mostly the result of elements outside their control" ~ 0,
+      position_society_effort == "A person‚Äôs position in society is mostly the result of individual effort" ~ 1,
+      position_society_effort == "A person’s position in society is mostly the result of individual effort" ~ 1,
+      position_society_effort == "Don't know" ~ NA_real_,
+      TRUE ~ as.numeric(position_society_effort)
+    )
+  )
+
+BAME3<-BAME3 %>%
+  mutate(
+    econgrowth_equality2 = case_when(
+      econgrowth_equality == "The Government should focus on growing the size of the UK‚Äôs economy more than they should on sharing out       wealth more equally" ~ 1, 
+     econgrowth_equality == "The Government should focus on growing the size of the UK’s economy more than they should on sharing out          wealth more equally" ~ 1, 
+      econgrowth_equality == "The Government should focus on sharing out wealth more equally than they should on growing the size of the economy" ~0,
+      econgrowth_equality == "Don't know" ~ NA_real_,
+      TRUE ~ as.numeric(econgrowth_equality)
+))
+
+
+BAME3<-BAME3 %>%
+  mutate(
+   gvmt_benefits2 = case_when(
+     gvmt_benefits == "People who are struggling to get by have a right to seek help from the Government" ~0, 
+     gvmt_benefits == "Government benefits are too readily available to people who have never contributed anything in return" ~ 1, 
+     gvmt_benefits == "Don't know" ~ NA_real_,
+     TRUE ~ as.numeric(gvmt_benefits)
+))
+
+BAME3<-BAME3 %>% 
+  mutate(
+    redistribution2 = case_when(
+      redistribution == "The Government should redistribute income from the better-off to those who are less well-off" ~ 0,
+      redistribution == "The Government should not redistribute income as people have a right to decide what to do with their own money" ~1,
+      redistribution == "Don't know" ~ NA_real_,
+      TRUE ~ as.numeric(redistribution)
+))
+
+
+## create econ index ##
+
+BAME3$econ_index<-(BAME3$redistribution2+BAME3$gvmt_benefits2+BAME3$econgrowth_equality2 +BAME3$position_society_effort2) 
+
+
+
+econ_index_2 <- BAME3 %>%
+  select(ethnicity, econ_index)
+
+econ_index_3 <- econ_index_2 %>%
+  group_by(ethnicity) %>%
+  summarize(mean_econ_index = mean(econ_index, na.rm = TRUE))
+
+ ggplot(econ_index_3, aes(ethnicity, mean_econ_index)) +
+   geom_point(aes(color = children_respect_independence), size = 3, color = "red") + 
+   theme_minimal() +
+  labs(title = "Left-Right Economic Values of Ethnic Groups",
+       x = "Ethnicity",
+       y = "Left-Right Economic Scale") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ 
+```
+
+
+```{r}
+## create alternative economic index - binary 0 where those who are hvae total score of less than or equal to 2 are classified as "left" and  those 3/4 right##
+
+econ_index_binary <- econ_index_2 %>%
+  mutate(econ_category = ifelse(econ_index <= 1, "Left", "Right")) %>%
+  na.omit() %>%
+  group_by(ethnicity, econ_category) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum(count) * 100)
+
+econ_index_binary %>%
+  ggplot(aes(ethnicity, proportion)) +
+  geom_point(aes(color = econ_category)) +
+  scale_color_manual(values = c("Left" = "red", "Right" = "blue"),
+                     labels = c("Left" = "Left", "Right" = "Right")) +
+  theme_minimal() +
+  labs(title = "Left-Right Economic Values of Ethnic Groups",
+       x = "Ethnicity",
+       y = "Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = "Economic Values"))
+
+  
+```
+
+```{r}
+## Economic values basd on age - binary left- right for economic ## 
+
+econ_index_binary_age <- BAME3 %>%
+  dplyr::select(age, econ_index, ethnicity) %>%
+  filter(!ethnicity=="White") %>%
+  mutate(econ_category = ifelse(econ_index <= 1, "Left", "Right")) %>%
+  na.omit() %>%
+  group_by(age, econ_category) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum(count) * 100)
+
+econ_index_binary_age %>%
+  ggplot(aes(age, proportion)) +
+  geom_point(aes(color = econ_category)) +
+  scale_color_manual(values = c("Left" = "red", "Right" = "blue"),
+                     labels = c("Left" = "Left", "Right" = "Right")) +
+  theme_minimal() +
+  labs(title = "Left-Right Economic Values of Ethnic Minorities by Age Group",
+       x = "Age Group",
+       y = "Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = "Economic Values"))
+```
+
+```{r}
+## economic values by generation - using binary left- right index ## 
+
+econ_index_binary_generation <- BAME3 %>%
+dplyr::select(time_uk, econ_index, ethnicity) %>% 
+  filter(!ethnicity == "White") %>%
+filter(time_uk %in% c("More than five years and less than ten years", 
+                          "Less than a year", 
+                          "More than forty years",
+                          "More than ten years and less than twenty years", 
+                          "More than two years and less than five years",
+                          "More than a year and less than two years",
+                          "More than twenty years and less than forty years")) %>%  
+  mutate(econ_category = ifelse(econ_index <= 1, "Left", "Right")) %>%
+  na.omit() %>%
+  group_by(time_uk, econ_category) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum(count) * 100)
+
+econ_index_binary_generation %>%
+  ggplot(aes(time_uk, proportion)) +
+  geom_point(aes(color = econ_category)) +
+  scale_color_manual(values = c("Left" = "red", "Right" = "blue"),
+                     labels = c("Left" = "Left", "Right" = "Right")) +
+  theme_minimal() +
+  labs(title = "Left-Right Economic Values of Ethnic Minorities by Generation",
+       x = "Genreation",
+       y = "Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = "Economic Values"))
+```
+
+
+
+
+
+```{r}
+
+## create alternative cultrual index - binary 0 where those who are hvae total score of less than or equal to 2 are classified as "left" and  those 3/4 right##
+
+
+prop.table(table(BAME3$ethnicity, BAME3$immigration), margin =1)
+
+prop.table(table(BAME3$ethnicity, BAME3$discrimination_white), margin =1)
+
+
+
+## values ## 
+
+## create index of culture values ## 
+## lower values more left wing ##
+## see if there is a way to keep the NAs in the calculation but then drop them from the plot ##
+BAME3<- BAME3 %>%
+  mutate( 
+    immigration2 = case_when(
+    immigration == "Immigration has enriched British culture and society" ~ 0,
+    immigration == "Immigration has undermined British culture and society" ~1, 
+    immigration == "Don't know" ~ NA_real_,
+      TRUE ~ as.numeric(immigration)
+))
+BAME3<- BAME3 %>%
+  mutate(
+    lgbtq_rights2 = case_when(
+    lgbtq_rights == "LGBTQ+ rights have not gone far enough" ~ 0, 
+     lgbtq_rights == "LGBTQ+ rights in this country have gone too far" ~1,
+      lgbtq_rights == "Don't know" ~ NA_real_,
+      TRUE ~ as.numeric(lgbtq_rights)
+))
+
+BAME3<- BAME3 %>%
+  mutate(
+    crime2 = case_when(
+      crime == "People turn to crime because they have no other option and it is the only route available to them to better their lives" ~ 0,
+      crime == "People who commit crimes do so because they‚Äôre fundamentally bad people" ~ 1,
+      crime == "People who commit crimes do so because they’re fundamentally bad people" ~ 1,
+      crime == "Don't know" ~ NA_real_,
+      TRUE ~ as.numeric(crime)
+))
+
+      
+  BAME3<- BAME3 %>% 
+    mutate(
+      overseas_aid2 = case_when(
+        overseas_aid == "The UK should increase spending on overseas aid to other countries" ~ 0, 
+        overseas_aid == "The UK should cut spending on overseas aid to other countries" ~ 1,
+        overseas_aid == "Don't know" ~ NA_real_,
+        TRUE ~ as.numeric(overseas_aid)
+))
+        
+    BAME3 <- BAME3 %>% 
+      mutate(
+    discrimination_white2 = case_when(
+      discrimination_white == "Discrimination against ethnic minorities continues to be far more significant than any discrimination against white people" ~ 0,
+  discrimination_white == "Discrimination against white people has become as big of a problem as discrimination against ethnic minorities" ~ 1,
+  discrimination_white == "Don't know" ~ NA_real_,
+        TRUE ~ as.numeric(discrimination_white)
+
+))
+      
+      
+```
+
+```{r}
+## COME BACK TO THIS ## 
+
+
+BAME3$culture_index<- (BAME3$lgbtq_rights2 + BAME3$crime2 + BAME3$overseas_aid2 +BAME3$immigration2 + BAME3$discrimination_white2)
+
+culture_index_binary <- BAME3 %>% dplyr:: select(culture_index, ethnicity) %>%
+  mutate(culture_category = ifelse(culture_index <= 2, "Left", "Right")) %>%
+  na.omit() %>%
+  group_by(ethnicity, culture_category) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum(count) * 100)
+
+culture_index_binary %>%
+  ggplot(aes(ethnicity, proportion)) +
+  geom_point(aes(color = culture_category)) +
+  scale_color_manual(values = c("Left" = "red", "Right" = "blue"),
+                     labels = c("Left" = "Left", "Right" = "Right")) +
+  theme_minimal() +
+  labs(title = "Left-Right Socio-cultural Values of Ethnic Minorities",
+       x = "Ethnicity",
+       y = "Left-Right") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = "Socio-cultural Values"))
+
+```
+
+```{r} 
+##  Cultural vales by age cohort ##
+
+culture_index_age <- BAME3 %>% dplyr:: select(culture_index, age) %>%
+  mutate(culture_category = ifelse(culture_index <= 2, "Left", "Right")) %>%
+  na.omit() %>%
+  group_by(age, culture_category) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum(count) * 100)
+
+culture_index_age %>%
+  ggplot(aes(age, proportion)) +
+  geom_point(aes(color = culture_category)) +
+  scale_color_manual(values = c("Left" = "red", "Right" = "blue"),
+                     labels = c("Left" = "Left", "Right" = "Right")) +
+  theme_minimal() +
+  labs(title = "Left-Right Socio-cultural Values of Ethnic Minorities by Age Group",
+       x = "Age",
+       y = "Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = "Socio-cultural Values"))
+
+```
+
+```{r}
+## Cultural vales by generation ##
+
+culture_index_generation <- BAME3 %>% dplyr:: select(culture_index, time_uk) %>%
+  filter(time_uk %in% c("More than five years and less than ten years", 
+                          "Less than a year", 
+                          "More than forty years",
+                          "More than ten years and less than twenty years", 
+                          "More than two years and less than five years",
+                          "More than a year and less than two years",
+                          "More than twenty years and less than forty years")) %>%  
+  mutate(culture_category = ifelse(culture_index <= 2, "Left", "Right")) %>%
+  na.omit() %>%
+  group_by(time_uk, culture_category) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum(count) * 100)
+
+culture_index_generation %>%
+  ggplot(aes(time_uk, proportion)) +
+  geom_point(aes(color = culture_category)) +
+  scale_color_manual(values = c("Left" = "red", "Right" = "blue"),
+                     labels = c("Left" = "Left", "Right" = "Right")) +
+  theme_minimal() +
+  labs(title = "Left-Right Socio-cultural Values of Ethnic Minorities by Generation",
+       x = "Generation",
+       y = "Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = "Socio-cultural Values"))
+
+```
+
+
+
+
+```{r}
+
+## Additional analysis PCA biplot ##
+white_respondents <- BAME3 %>%
+   select(ethnicity, position_society_effort2, redistribution2, immigration2, crime2, lgbtq_rights2, overseas_aid2, gvmt_benefits2, discrimination_white2, econgrowth_equality2) %>%
+  filter(ethnicity=="White")
+
+## delete where missing 
+white_respondents <- na.omit(white_respondents)
+
+
+  
+
+minority_respondents<- BAME3 %>%
+  select(ethnicity, position_society_effort2, redistribution2, immigration2, crime2, lgbtq_rights2, overseas_aid2, gvmt_benefits2, discrimination_white2, econgrowth_equality2) %>%
+  filter(!ethnicity=="White")
+  
+## delete where missing 
+minority_respondents <- na.omit(minority_respondents)
+
+
+```
+
+
+```{r}
+## Q6 - British Identity 
+## Views of UK instituions 
+## view of uk government#
+uk_gvmt <- BAME3 %>% 
+  dplyr::select(ethnicity, instituions_uk_gvmt) %>%
+  group_by(ethnicity) %>%
+  summarize(mean_attitudes_uk_gvmt = mean(instituions_uk_gvmt, na.rm = TRUE))
+
+ggplot(uk_gvmt, aes(fill = ethnicity, x = ethnicity, y = mean_attitudes_uk_gvmt)) +
+  geom_bar(position = "dodge", stat = "identity") +
+   theme_minimal() +
+  labs(title = "Unfavourable/Favourable View of UK Government Among Different Ethnic Minority Groups",
+       x = "Ethnicity",
+       y = "Mean Score, 0-100") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = NULL))
+
+```
+
+```{r}
+## instutions bbc ##
+
+bbc <- BAME3 %>% 
+  dplyr::select(ethnicity, institutions_bbc) %>%
+  group_by(ethnicity) %>%
+  summarize(mean_attitudes_bbc = mean(institutions_bbc, na.rm = TRUE))
+
+ggplot(bbc, aes(fill = ethnicity, x = ethnicity, y = mean_attitudes_bbc)) +
+  geom_bar(position = "dodge", stat = "identity") +
+   theme_minimal() +
+  labs(title = "Unfavourable/Favourable View of BBC Among Different Ethnic Minority Groups",
+       x = "Ethnicity",
+       y = "Mean Score, 0-100") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = NULL))
+```
+
+```{r}
+## institutions commonwealth## 
+commonwealth <- BAME3 %>% 
+  dplyr::select(ethnicity, institutions_commonwealth) %>%
+  group_by(ethnicity) %>%
+  summarize(mean_attitudes_commonwealth = mean(institutions_commonwealth, na.rm = TRUE))
+
+ggplot(commonwealth, aes(fill = ethnicity, x = ethnicity, y = mean_attitudes_commonwealth)) +
+  geom_bar(position = "dodge", stat = "identity") +
+   theme_minimal() +
+  labs(title = "Unfavourable/Favourable View of Commonwealth Among Different Ethnic Minority Groups",
+       x = "Ethnicity",
+       y = "Mean Score, 0-100") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = NULL))
+
+```
+
+```{r}
+education <- BAME3 %>% 
+  dplyr::select(ethnicity, institutions_education) %>%
+  group_by(ethnicity) %>%
+  summarize(mean_attitudes_education = mean(institutions_education, na.rm = TRUE))
+
+ggplot(education, aes(fill = ethnicity, x = ethnicity, y = mean_attitudes_education)) +
+  geom_bar(position = "dodge", stat = "identity") +
+   theme_minimal() +
+  labs(title = "Unfavourable/Favourable View of Educational Institutions Among Different Ethnic Minority Groups",
+       x = "Ethnicity",
+       y = "Mean Score, 0-100") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = NULL))
+```
+
+```{r}
+## Home Office ## 
+home_office <- BAME3 %>% 
+  dplyr::select(ethnicity, institutions_home_office) %>%
+  group_by(ethnicity) %>%
+  summarize(mean_attitudes_home_office = mean(institutions_home_office, na.rm = TRUE))
+
+ggplot(home_office, aes(fill = ethnicity, x = ethnicity, y = mean_attitudes_home_office)) +
+  geom_bar(position = "dodge", stat = "identity") +
+   theme_minimal() +
+  labs(title = "Unfavourable/Favourable View of Home Office Among Different Ethnic Minority Groups",
+       x = "Ethnicity",
+       y = "Mean Score, 0-100") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = NULL))
+```
+
+```{r}
+## Monarchy ## 
+monarchy <- BAME3 %>% 
+  dplyr::select(ethnicity, institutions_monarchy) %>%
+  group_by(ethnicity) %>%
+  summarize(mean_attitudes_monarchy = mean(institutions_monarchy, na.rm = TRUE))
+
+ggplot(monarchy, aes(fill = ethnicity, x = ethnicity, y = mean_attitudes_monarchy)) +
+  geom_bar(position = "dodge", stat = "identity") +
+   theme_minimal() +
+  labs(title = "Unfavourable/Favourable View of Monarchy Among Different Ethnic Minority Groups",
+       x = "Ethnicity",
+       y = "Mean Score, 0-100") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = NULL))
+
+```
+
+```{r}
+
+## NHS 
+nhs <- BAME3 %>% 
+  dplyr::select(ethnicity, institutions_nhs) %>%
+  group_by(ethnicity) %>%
+  summarize(mean_attitudes_nhs = mean(institutions_nhs, na.rm = TRUE))
+
+ggplot(nhs, aes(fill = ethnicity, x = ethnicity, y = mean_attitudes_nhs)) +
+  geom_bar(position = "dodge", stat = "identity") +
+   theme_minimal() +
+  labs(title = "Unfavourable/Favourable View of NHS Among Different Ethnic Minority Groups",
+       x = "Ethnicity",
+       y = "Mean Score, 0-100") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = NULL))
+```
+
+```{r}
+## Police ## 
+police <- BAME3 %>% 
+  dplyr::select(ethnicity, institutions_police) %>%
+  group_by(ethnicity) %>%
+  summarize(mean_attitudes_police = mean(institutions_police, na.rm = TRUE))
+
+ggplot(police, aes(fill = ethnicity, x = ethnicity, y = mean_attitudes_police)) +
+  geom_bar(position = "dodge", stat = "identity") +
+   theme_minimal() +
+  labs(title = "Unfavourable/Favourable View ofPolice Among Different Ethnic Minority Groups",
+       x = "Ethnicity",
+       y = "Mean Score, 0-100") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = NULL))
+```
+
+```{r}
+## Religious Instituions# 
+
+religious<- BAME3 %>% 
+  dplyr::select(ethnicity, institutions_religious) %>%
+  group_by(ethnicity) %>%
+  summarize(mean_attitudes_religious = mean(institutions_religious, na.rm = TRUE))
+
+ggplot(religious, aes(fill = ethnicity, x = ethnicity, y = mean_attitudes_religious)) +
+  geom_bar(position = "dodge", stat = "identity") +
+   theme_minimal() +
+  labs(title = "Unfavourable/Favourable View of Religious Institutions Among Different Ethnic Minority Groups",
+       x = "Ethnicity",
+       y = "Mean Score, 0-100") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = NULL))
+```
+
+
+
+
+```{r}
+## welsh government ## 
+welsh_gvmt <- BAME3 %>% 
+  dplyr::select(ethnicity, institutions_welsh_gvmt) %>%
+  group_by(ethnicity) %>%
+  summarize(mean_attitudes_welsh_gvmt = mean(institutions_welsh_gvmt, na.rm = TRUE))
+
+ggplot(welsh_gvmt, aes(fill = ethnicity, x = ethnicity, y = mean_attitudes_welsh_gvmt)) +
+  geom_bar(position = "dodge", stat = "identity") +
+   theme_minimal() +
+  labs(title = "Unfavourbale/Favourbale View of Welsh Government Among Different Ethnic Minority Groups",
+       x = "Ethnicity",
+       y = "Mean Score, 0-100") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = NULL))
+```
+
+
+```{r}
+## Q6. Britisih Identity - what makes you proud to be British ## 
+
+proud_university <- BAME3 %>%
+  dplyr::select(ethnicity, proud_university_rankings) %>%
+  group_by(ethnicity, proud_university_rankings) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum(count) * 100)
+
+# Filtering to include only "Selected" values
+proud_university_selected <- proud_university %>%
+  filter(proud_university_rankings == "Selected")
+
+ggplot(proud_university_selected, aes(x = ethnicity, y = proportion, fill = proud_university_rankings)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Does the UK being a world leader in University Rankings make you proud to live in the UK",
+       x = "Ethnicity",
+       y = "Proportion") +
+  scale_fill_manual(values = c("Selected" = "blue"), name = "Response") +
+  theme_minimal() +
+ theme(legend.position = "none")
+
+```
+
+```{r}
+## ## raise family  ## 
+raise_family <- BAME3 %>%
+  dplyr::select(ethnicity, proud_place_raise_family) %>%
+group_by(ethnicity, proud_place_raise_family) %>%
+summarize(count = n()) %>%
+mutate(proportion = count / sum(count) * 100)
+
+
+# Filtering to include only "Selected" values
+proud_raise_family_selected <- raise_family %>%
+  filter(proud_place_raise_family == "Selected")
+
+ggplot(proud_raise_family_selected, aes(x = ethnicity, y = proportion, fill = proud_place_raise_family)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Does Being the Best Place to Raise a Family Make You Proud to live in the UK",
+       x = "Ethnicity",
+       y = "Proportion") +
+  scale_fill_manual(values = c("Selected" = "blue"), name = "Response") +
+  theme_minimal() +
+   theme(legend.position = "none")
+```
+
+
+```{r}
+
+## ## start busisness  ## 
+start_business <- BAME3 %>%
+  dplyr::select(ethnicity, proud_place_start_business) %>%
+group_by(ethnicity, proud_place_start_business) %>%
+summarize(count = n()) %>%
+mutate(proportion = count / sum(count) * 100)
+
+
+# Filtering to include only "Selected" values
+proud_start_business_selected <- start_business %>%
+  filter(proud_place_start_business == "Selected")
+
+ggplot(proud_start_business_selected, aes(x = ethnicity, y = proportion, fill = proud_place_start_business)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Does Being the Best Place to Start a Business Make You Proud to live in the UK",
+       x = "Ethnicity",
+       y = "Proportion") +
+  scale_fill_manual(values = c("Selected" = "blue"), name = "Response") +
+  theme_minimal() +
+  theme (legend.position = "none")
+```
+
+
+```{r}
+
+## envrinmental leaders ##
+
+environmental_leader <- BAME3 %>%
+  dplyr::select(ethnicity, proud_enviro_leader) %>%
+group_by(ethnicity, proud_enviro_leader) %>%
+summarize(count = n()) %>%
+mutate(proportion = count / sum(count) * 100)
+
+
+# Filtering to include only "Selected" values
+proud_environmental_leader_selected <- environmental_leader %>%
+  filter(proud_enviro_leader == "Selected")
+
+ggplot(proud_environmental_leader_selected, aes(x = ethnicity, y = proportion, fill = proud_enviro_leader)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Does Being An Environmental Leader Make You Proud to Live in the UK",
+       x = "Ethnicity",
+       y = "Proportion") +
+  scale_fill_manual(values = c("Selected" = "blue"), name = "Response") +
+  theme_minimal() + 
+  theme (legend.position = "none")
+```
+
+
+```{r}
+## health care - proud to be british ## 
+
+healthcare <- BAME3 %>%
+  dplyr::select(ethnicity, proud_healthcare) %>%
+group_by(ethnicity, proud_healthcare) %>%
+summarize(count = n()) %>%
+mutate(proportion = count / sum(count) * 100)
+
+
+
+# Filtering to include only "Selected" values
+proud_healthcare_selected <- healthcare %>%
+  filter(proud_healthcare == "Selected")
+
+ggplot(proud_healthcare_selected, aes(x = ethnicity, y = proportion, fill = proud_healthcare)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Does the UK Healthcare System Make You Proud to Live in the UK",
+       x = "Ethnicity",
+       y = "Proportion") +
+  scale_fill_manual(values = c("Selected" = "blue"), name = "Response") +
+  theme_minimal() + 
+  theme (legend.position = "none")
+```
+
+
+```{r}
+## proud diversity ##
+
+diversity  <- BAME3 %>%
+  dplyr::select(ethnicity, proud_diversity) %>%
+group_by(ethnicity, proud_diversity) %>%
+summarize(count = n()) %>%
+mutate(proportion = count / sum(count) * 100)
+
+
+# Filtering to include only "Selected" values
+proud_diversity_selected <- diversity %>%
+  filter(proud_diversity == "Selected")
+
+ggplot(proud_diversity_selected, aes(x = ethnicity, y = proportion, fill = proud_diversity)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Does Diversity in the UK Make You Proud to Live in the UK",
+       x = "Ethnicity",
+       y = "Proportion") +
+  scale_fill_manual(values = c("Selected" = "blue"), name = "Response") +
+  theme_minimal() +
+  theme (legend.position = "none")
+```
+
+
+``` {r}
+#none of the above ## 
+
+none_above <- BAME3 %>%
+  dplyr::select(proud_none_above, ethnicity) %>%
+group_by(ethnicity, proud_none_above) %>%
+summarize(count = n()) %>%
+mutate(proportion = count / sum(count) * 100)
+
+
+# Filtering to include only "Selected" values
+proud_none_above_selected <- none_above %>%
+  filter(proud_none_above == "Selected")
+
+ggplot(proud_none_above_selected, aes(x = ethnicity, y = proportion, fill = proud_none_above)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "None Of the Above Reasons Make You Proud to Live in the UK",
+       x = "Ethnicity",
+       y = "Proportion") +
+  scale_fill_manual(values = c("Selected" = "blue"), name = "Response") +
+  theme_minimal() +
+  theme (legend.position = "none")
+```
+
+
+```{r}
+## Q6 - WHAT IS IMPORTANT TO BEING TRULY BRITISH ##
+
+## british identity - importat to being British - born here ## 
+
+
+born_here <- BAME3 %>%
+  dplyr::select(being_british_bornhere, ethnicity) %>%
+group_by(ethnicity, being_british_bornhere) %>%
+summarize(count = n()) %>%
+mutate(proportion = count / sum(count) * 100)
+
+
+# Filtering to include only "Selected" values
+born_here_selected <- born_here %>%
+  filter(being_british_bornhere == "Selected")
+
+ggplot(born_here_selected, aes(x = ethnicity, y = proportion, fill = being_british_bornhere)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Bring Born in the UK is Important to Being British",
+       x = "Ethnicity",
+       y = "Proportion") +
+  scale_fill_manual(values = c("Selected" = "blue"), name = "Response") +
+  theme_minimal() +
+   theme (legend.position = "none")
+```
+
+
+```{r}
+## british identity - importat to being British - respect institutions and laws ## 
+institutions_laws <- BAME3 %>%
+  dplyr::select(being_british_insitutionslaw, ethnicity) %>%
+group_by(ethnicity, being_british_insitutionslaw) %>%
+summarize(count = n()) %>%
+mutate(proportion = count / sum(count) * 100)
+
+
+# Filtering to include only "Selected" values
+institutions_laws_selected <- institutions_laws %>%
+  filter(being_british_insitutionslaw == "Selected")
+
+ggplot(institutions_laws_selected, aes(x = ethnicity, y = proportion, fill = being_british_insitutionslaw)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Respecting the Law and Institutions of the UK is Important to Being British",
+       x = "Ethnicity",
+       y = "Proportion") +
+  scale_fill_manual(values = c("Selected" = "blue"), name = "Response") +
+  theme_minimal() +
+   theme (legend.position = "none")
+```
+
+
+```{r}
+## british identity - importat to being British - ancestry  ## 
+ancestary <- BAME3 %>%
+  dplyr::select(being_british_ancestary, ethnicity) %>%
+group_by(ethnicity, being_british_ancestary) %>%
+summarize(count = n()) %>%
+mutate(proportion = count / sum(count) * 100)
+
+
+# Filtering to include only "Selected" values
+ancestary_selected <- ancestary %>%
+  filter(being_british_ancestary == "Selected")
+
+ggplot(ancestary_selected, aes(x = ethnicity, y = proportion, fill = being_british_ancestary)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Having British Ancestary is Important to Being British",
+       x = "Ethnicity",
+       y = "Proportion") +
+  scale_fill_manual(values = c("Selected" = "blue"), name = "Response") +
+  theme_minimal() +
+  theme (legend.position = "none")
+```
+
+```{r}
+## british identity - importat to being British - christian  ## 
+christian <- BAME3 %>%
+  dplyr::select(being_british_christian, ethnicity) %>%
+group_by(ethnicity, being_british_christian) %>%
+summarize(count = n()) %>%
+mutate(proportion = count / sum(count) * 100)
+
+
+# Filtering to include only "Selected" values
+christian_selected <- christian %>%
+  filter(being_british_christian == "Selected")
+
+ggplot(christian_selected, aes(x = ethnicity, y = proportion, fill = being_british_christian)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Being Christian Is Important to Being British",
+       x = "Ethnicity",
+       y = "Proportion") +
+  scale_fill_manual(values = c("Selected" = "blue", "NotSelected" = "red"), name = "Response") +
+  theme_minimal() + 
+   theme (legend.position = "none")
+  
+```
+
+```{r}
+## british identity - importat to being British - citizenship  ## 
+citizenship <- BAME3 %>%
+  dplyr::select(being_british_citizenship, ethnicity) %>%
+group_by(ethnicity, being_british_citizenship) %>%
+summarize(count = n()) %>%
+mutate(proportion = count / sum(count) * 100)
+
+
+# Filtering to include only "Selected" values
+citizenship_selected <- citizenship %>%
+  filter(being_british_citizenship == "Selected")
+
+ggplot(citizenship_selected, aes(x = ethnicity, y = proportion, fill = being_british_citizenship)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Having British Citizneship is Important to Being British",
+       x = "Ethnicity",
+       y = "Proportion") +
+  scale_fill_manual(values = c("Selected" = "blue"), name = "Response") +
+  theme_minimal() +
+    theme (legend.position = "none")
+```
+
+```{r}
+# Important to being british Culture ## 
+culture <- BAME3 %>%   
+dplyr::select(being_british_culture, ethnicity) %>%
+group_by(ethnicity, being_british_culture) %>%
+summarize(count = n()) %>%
+mutate(proportion = count / sum(count) * 100)
+
+
+# Filtering to include only "Selected" values
+culture_selected <- culture %>%
+  filter(being_british_culture == "Selected")  
+
+
+ggplot(culture_selected, aes(x = ethnicity, y = proportion, fill = being_british_culture)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Appreciating British Culutre is Important to Being British",
+       x = "Ethnicity",
+       y = "Proportion") +
+  scale_fill_manual(values = c("Selected" = "blue"), name = "Response") +
+  theme_minimal() +
+  theme (legend.position = "none")
+  
+```
+
+```{r}
+## ## Important to being British Parents being born in Britain#
+parents_born <- BAME3 %>%   
+dplyr::select(being_british_parentsbornbrit, ethnicity) %>%
+group_by(ethnicity, being_british_parentsbornbrit) %>%
+summarize(count = n()) %>%
+mutate(proportion = count / sum(count) * 100)
+
+
+# Filtering to include only "Selected" values
+parents_born_selected <- parents_born %>%
+  filter(being_british_parentsbornbrit == "Selected")  
+
+ggplot(parents_born_selected, aes(x = ethnicity, y = proportion, fill = being_british_parentsbornbrit)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Too be truly Brtisih it is Important Your Parents Were Born in the UK",
+       x = "Ethnicity",
+       y = "Proportion") +
+  scale_fill_manual(values = c("Selected" = "blue"), name = "Response") +
+  theme_minimal() +
+  theme (legend.position = "none")
+```
+
+```{r}
+## ## Important to being British speak the langauge Britain#
+language <- BAME3 %>%   
+dplyr::select(being_british_speaklang, ethnicity) %>%
+group_by(ethnicity, being_british_speaklang) %>%
+summarize(count = n()) %>%
+mutate(proportion = count / sum(count) * 100)
+
+
+# Filtering to include only "Selected" values
+language_selected <- language %>%
+  filter(being_british_speaklang == "Selected")  
+
+ggplot(language_selected, aes(x = ethnicity, y = proportion, fill = being_british_speaklang)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Speaking English/Welsh/Gaelic is Important to Being British",
+       x = "Ethnicity",
+       y = "Proportion") +
+  scale_fill_manual(values = c("Selected" = "blue", "NotSelected" = "red"), name = "Response") +
+  theme_minimal() +
+  theme (legend.position = "none")
+```
+
+```{r}
+## ## Important to being British -  white #
+#
+white <- BAME3 %>%   
+dplyr::select(being_british_white, ethnicity) %>%
+group_by(ethnicity, being_british_white) %>%
+summarize(count = n()) %>%
+mutate(proportion = count / sum(count) * 100)
+
+
+# Filtering to include only "Selected" values
+white_selected <- white %>%
+  filter(being_british_white == "Selected")  
+
+ggplot(white_selected, aes(x = ethnicity, y = proportion, fill = being_british_white)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Being White is Important to Being British",
+       x = "Ethnicity",
+       y = "Proportion") +
+  scale_fill_manual(values = c("Selected" = "blue"), name = "Response") +
+  theme_minimal() +
+    theme (legend.position = "none")
+  
+```
+
+```{r}
+## ## Important to being British is to pay work and taxes## 
+work_taxes <- BAME3 %>%   
+dplyr::select(being_british_worktaxes, ethnicity) %>%
+group_by(ethnicity, being_british_worktaxes) %>%
+summarize(count = n()) %>%
+mutate(proportion = count / sum(count) * 100)
+
+
+
+# Filtering to include only "Selected" values
+work_taxes_selected <- work_taxes %>%
+  filter(being_british_worktaxes == "Selected")  
+
+ggplot(work_taxes_selected, aes(x = ethnicity, y = proportion, fill = being_british_worktaxes)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Working and Paying Taxes is Important to Being British",
+       x = "Ethnicity",
+       y = "Proportion") +
+  scale_fill_manual(values = c("Selected" = "blue"), name = "Response") +
+  theme_minimal() +
+      theme (legend.position = "none")
+```
+
+```{r}
+## Important to Being British Consider Yourself ## 
+
+consider_yourself <- BAME3 %>%   
+dplyr::select(being_brtisih_consider_yourself, ethnicity) %>%
+group_by(ethnicity, being_brtisih_consider_yourself) %>%
+summarize(count = n()) %>%
+mutate(proportion = count / sum(count) * 100)
+
+
+# Filtering to include only "Selected" values
+consider_yourself_selected <- consider_yourself %>%
+  filter(being_brtisih_consider_yourself == "Selected")      
+
+ggplot(consider_yourself_selected, aes(x = ethnicity, y = proportion, fill = being_brtisih_consider_yourself)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Considering Yourself to be British is Important to Being British",
+       x = "Ethnicity",
+       y = "Proportion") +
+  scale_fill_manual(values = c("Selected" = "blue"), name = "Response") +
+  theme_minimal() +
+  theme (legend.position = "none")
+```
+
+```{r}
+## RACE AND DISCRIMINATION ## 
+
+# Who would you not want as a neighbour ## 
+## GAY ## 
+
+## create table for slope graph with BAME overall and sub-groups ## 
+total_count <- nrow(BAME3)
+
+table_not_neighbour_gay <- BAME3 %>%
+  group_by(ethnicity) %>%
+  summarize(prop_selected_ethnicity = (sum(not_neighbour_gay == "Selected", na.rm = TRUE) / n()) * 100) %>%
+  ungroup() %>%
+  mutate(prop_selected_all = (sum(BAME3$not_neighbour_gay == "Selected", na.rm = TRUE) / total_count) * 100)
+```
+
+```{r}
+
+# Create separate dataframes for labels
+labels_bame_all_neighbour_gay <- data.frame(
+  x = 0,  # x position for "BAME Voters" label
+  y = table_not_neighbour_gay$prop_selected_all,
+  label = "BAME Voters"
+)
+
+labels_ethnicity_neighbour_gay <- data.frame(
+  x = rep(1, nrow(table_not_neighbour_gay)),  # x positions for ethnicities
+  y = table_not_neighbour_gay$prop_selected_ethnicity,
+  label = table_not_neighbour_gay$ethnicity
+)
+
+# Combine the dataframes
+labels_df_neighbour_gay <- rbind(labels_bame_all_neighbour_gay, labels_ethnicity_neighbour_gay)
+
+# Create the plot
+labels_df_neighbour_gay$label2 <- paste0(labels_df_neighbour_gay$label," (",round(labels_df_neighbour_gay$y,1),"%) ")
+
+labels_df_neighbour_gay$y2 <- labels_df_neighbour_gay$y
+
+labels_df_neighbour_gay$y2[17] <- 14
+labels_df_neighbour_gay$y2[12] <- 15
+labels_df_neighbour_gay$y2[15] <- 16
+labels_df_neighbour_gay$y2[16] <- 17
+
+ggplot(table_not_neighbour_gay, aes(x = as.factor(1))) +
+  geom_text(data = labels_df_neighbour_gay[c(12:22),], aes(x = x, y = y2, label = label2, hjust = ifelse(label2 == "BAME Voters", 1, -0.2))) +
+  geom_text(data = labels_df_neighbour_gay[c(1),], aes(x = x, y = y2, label = label2, 
+                                             hjust=1)) +
+  geom_segment(aes(x = 0, xend = 1, y = prop_selected_all, yend = prop_selected_ethnicity), color='red', linewidth=2) +
+  ## add the white outline for the point at each rate of BAME ##  
+  geom_point(aes(x=1, y=prop_selected_ethnicity), color='black', size=2.5) +
+  
+  #theme_void() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text = element_blank()) +
+
+  labs(x = NULL, y = "Proportion Selected (%)") +
+  scale_x_continuous(limits=c(-0.2,1.4)) +
+  geom_vline(aes(xintercept=0),color="grey") +
+  geom_vline(aes(xintercept=1),color="grey")
+
+```
+
+
+
+
+```{r}
+
+##
+# Q8 WHO FACES DISCRIMINATION 
+## How much discrimination is there against the following groups ## 
+
+## Convert to numeric and change clean values of 10 and 1
+
+BAME3 <- BAME3 %>%
+  mutate(
+    discrimination_black_minority_2 = case_when(
+      discrimination_black_minority == "10 - a significant amount" ~ "10",
+      discrimination_black_minority == "0 - none at all" ~ "1",
+      TRUE ~ as.character(discrimination_black_minority)))
+
+
+BAME3$discrimination_black_minority_2 <- as.numeric(as.character(BAME3$discrimination_black_minority_2))
+
+BAME3 <- BAME3 %>%
+  mutate(
+    discrimination_poor_2 = case_when(
+      discrimination_poor == "10 - a significant amount" ~ "10",
+      discrimination_poor == "0 - none at all" ~ "1",
+      TRUE ~ as.character(discrimination_poor)))
+
+
+BAME3$discrimination_poor_2 <- as.numeric(as.character(BAME3$discrimination_poor_2))
+
+
+BAME3 <- BAME3 %>%
+  mutate(
+    discrimination_old_2 = case_when(
+      discrimination_old == "10 - a significant amount" ~ "10",
+      discrimination_old == "0 - none at all" ~ "1",
+      TRUE ~ as.character(discrimination_old)))
+
+
+BAME3$discrimination_old_2 <- as.numeric(as.character(BAME3$discrimination_old_2))
+
+BAME3 <- BAME3 %>%
+  mutate(
+    discrimination_young_2 = case_when(
+      discrimination_young == "10 - a significant amount" ~ "10",
+      discrimination_young == "0 - none at all" ~ "1",
+      TRUE ~ as.character(discrimination_young)))
+
+
+BAME3$discrimination_young_2 <- as.numeric(as.character(BAME3$discrimination_young_2))
+
+
+BAME3 <- BAME3 %>%
+  mutate(
+    discrimination_welfare_2 = case_when(
+      discrimination_welfare == "10 - a significant amount" ~ "10",
+      discrimination_welfare == "0 - none at all" ~ "1",
+      TRUE ~ as.character(discrimination_welfare)))
+
+
+BAME3$discrimination_welfare_2 <- as.numeric(as.character(BAME3$discrimination_welfare_2))
+
+
+BAME3 <- BAME3 %>%
+  mutate(
+    discrimination_lgbtq_2 = case_when(
+      discrimination_lgbtq == "10 - a significant amount" ~ "10",
+      discrimination_lgbtq == "0 - none at all" ~ "1",
+      TRUE ~ as.character(discrimination_lgbtq)))
+
+
+BAME3$discrimination_lgbtq_2 <- as.numeric(as.character(BAME3$discrimination_lgbtq_2))
+
+
+BAME3 <- BAME3 %>%
+  mutate(
+    discrimination_white_3 = case_when(
+      discrimination_white_2 == "10 - a significant amount" ~ "10",
+      discrimination_white_2 == "0 - none at all" ~ "1",
+      TRUE ~ as.character(discrimination_white_2)))
+
+
+BAME3$discrimination_white_3 <- as.numeric(as.character(BAME3$discrimination_white_3))
+
+```
+
+```{r}
+## create dot plot for discrimination ## 
+## discriminaiton against black minorities##  
+
+black_minority <- BAME3 %>%
+  dplyr::select (ethnicity, discrimination_black_minority_2) %>%
+   group_by(ethnicity) %>%
+  summarize(avg_black_minority = mean(discrimination_black_minority_2, na.rm = TRUE))
+  
+ ggplot(black_minority, aes(ethnicity, avg_black_minority)) +
+   geom_point(aes(color = avg_black_minoirty), size = 3, color = "red") + 
+   theme_minimal() +
+  labs(title = "How Much Discrimination Is There Againt Black Minorities",
+       x = "Ethnicity",
+       y = "Level of Discriminiation") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+  
+```{r}  
+## create dot plot discrimination against poor 
+
+poor <- BAME3 %>%
+  dplyr::select (ethnicity, discrimination_poor_2) %>%
+   group_by(ethnicity) %>%
+  summarize(avg_poor = mean(discrimination_poor_2, na.rm = TRUE))
+  
+ ggplot(poor, aes(ethnicity, avg_poor)) +
+   geom_point(aes(color = avg_poor), size = 3, color = "red") + 
+   theme_minimal() +
+  labs(title = "How Much Discrimination Is There Againt the Poor",
+       x = "Ethnicity",
+       y = "Level of Discriminiation") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+## discrimination aginst old 
+old <- BAME3 %>%
+  dplyr::select (ethnicity, discrimination_old_2) %>%
+   group_by(ethnicity) %>%
+  summarize(avg_old = mean(discrimination_old_2, na.rm = TRUE))
+  
+ ggplot(old, aes(ethnicity, avg_old)) +
+   geom_point(aes(color = avg_old), size = 3, color = "red") + 
+   theme_minimal() +
+  labs(title = "How Much Discrimination Is There Againt the Old",
+       x = "Ethnicity",
+       y = "Level of Discriminiation") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+## discrimination aginst young
+young <- BAME3 %>%
+  dplyr::select (ethnicity, discrimination_young_2) %>%
+   group_by(ethnicity) %>%
+  summarize(avg_young = mean(discrimination_young_2, na.rm = TRUE))
+  
+ ggplot(young, aes(ethnicity, avg_young)) +
+   geom_point(aes(color = avg_young), size = 3, color = "red") + 
+   theme_minimal() +
+  labs(title = "How Much Discrimination Is There Againt the Young",
+       x = "Ethnicity",
+       y = "Level of Discriminiation") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+## discrimination against those on welfare # 
+
+welfare <- BAME3 %>%
+  dplyr::select (ethnicity, discrimination_welfare_2) %>%
+   group_by(ethnicity) %>%
+  summarize(avg_welfare = mean(discrimination_welfare_2, na.rm = TRUE))
+  
+ ggplot(welfare, aes(ethnicity, avg_welfare)) +
+   geom_point(aes(color = avg_welfare), size = 3, color = "red") + 
+   theme_minimal() +
+  labs(title = "How Much Discrimination Is There Againt those on Welare Benefits",
+       x = "Ethnicity",
+       y = "Level of Discriminiation") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+
+## discrimination against LGBTQ ## 
+lgbtq <- BAME3 %>%
+  dplyr::select (ethnicity, discrimination_lgbtq_2) %>%
+   group_by(ethnicity) %>%
+  summarize(avg_lgbtq = mean(discrimination_lgbtq_2, na.rm = TRUE))
+  
+ ggplot(lgbtq, aes(ethnicity, avg_lgbtq)) +
+   geom_point(aes(color = avg_lgbtq), size = 3, color = "red") + 
+   theme_minimal() +
+  labs(title = "How Much Discrimination Is There Againt LGBTQ Individuals",
+       x = "Ethnicity",
+       y = "Level of Discriminiation") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r} 
+## discrimination against whites ## 
+
+whites <- BAME3 %>%
+  dplyr::select (ethnicity, discrimination_white_3) %>%
+   group_by(ethnicity) %>%
+  summarize(avg_whites = mean(discrimination_white_3, na.rm = TRUE))
+  
+ ggplot(whites, aes(ethnicity, avg_whites)) +
+   geom_point(aes(color = avg_whites), size = 3, color = "red") + 
+   theme_minimal() +
+  labs(title = "How Much Discrimination Is There Againt Whites",
+       x = "Ethnicity",
+       y = "Level of Discriminiation") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+## Q9 RACE RELATIONS IN THE UK 
+
+## convert to numbeeric and create net agreement vlaues for satements ##
+## assign a all agree and strongly agree a value of 1 strongly disagree and disagree value of 0  then substract the values to get #
+## ask about neither agree nor disagree ##
+
+BAME3 <- BAME3 %>%
+  mutate(
+    race_relations_bad2 = case_when(
+        race_relations_bad == "Strongly agree" ~ "1",
+        race_relations_bad == "Somewhat agree" ~ "1",
+        race_relations_bad == "Neither agree nor disagree" ~ "0",
+        race_relations_bad == "Strongly disagree" ~ "2",
+        race_relations_bad == "Somewhat diagree" ~ "2",
+        race_relations_bad == "Don't know" ~ NA_character_, 
+        race_relations_bad == "Don‚Äôt know" ~ NA_character_, 
+      TRUE ~ as.character(race_relations_bad)))
+
+
+BAME3$race_relations_bad2 <- as.numeric(as.character(BAME3$race_relations_bad2))
+
+```
+
+```{r}
+## crate net race relations table
+## Race relations in the country are bad ##
+
+net_race_relations <- BAME3 %>%
+  select(ethnicity, race_relations_bad2) %>%
+  filter(!is.na(race_relations_bad2)) %>%
+  group_by(ethnicity) %>%
+  summarize (prop_1 = sum(race_relations_bad2 == 1) / n() * 100,
+             prop_0 = sum(race_relations_bad2 == 0) / n() * 100,
+             prop_2 = sum(race_relations_bad2 == 2) /n() *100)
+
+## creat dataset in long for group bar chart ## 
+net_race_relations_long <- pivot_longer(net_race_relations, cols = c(prop_1, prop_0, prop_2), names_to = "Response", values_to = "Proportion")
+
+# Create the grouped bar chart
+ggplot(net_race_relations_long, aes(x = ethnicity, y = Proportion, fill = Response)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), color = "black") +
+  scale_fill_manual(values = c("blue", "orange", "red"), name = "Response",
+                    breaks = c("prop_1", "prop_0", "prop_2"),
+                    labels = c("Agree", "Neither Agree Nor Disagree", "Disagree")) +
+  labs(title = "Do You Think Race Relations in the Country Are Bad",
+       x = "Ethnicity",
+       y = "Proportion (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+
+
+```{r}
+## Q8. RACE AND DISCRIMINATION _ TO WHAT EXTENT DO YO AGGREE WITH THE FOLLOWING STATEMENTS ##  
+## convert to numeric and create net agreement values for statemnts ##
+## Ethnic background difficult to get ahead 
+## assign a all agree and strongly agree a value of 1 strongly disagree and disagree value of 0  then subtract the values to get #
+
+BAME3 <- BAME3 %>%
+  mutate(
+    ethnic_background_difficult_ahead2 = case_when(
+        ethnic_background_difficult_ahead == "Strongly agree" ~ "1",
+        ethnic_background_difficult_ahead == "Somewhat agree" ~ "1",
+        ethnic_background_difficult_ahead == "Neither agree nor disagree" ~ "0",
+        ethnic_background_difficult_ahead == "Somewhat disagree" ~ "2",
+        ethnic_background_difficult_ahead == "Strongly disagree" ~ "0",
+        ethnic_background_difficult_ahead == "Don't know" ~ NA_character_, 
+        ethnic_background_difficult_ahead == "Don‚Äôt know" ~ NA_character_, 
+      TRUE ~ as.character(ethnic_background_difficult_ahead)))
+
+
+BAME3$ethnic_background_difficult_ahead2 <- as.numeric(as.character(BAME3$ethnic_background_difficult_ahead2))
+
+```
+
+```{r}
+## crate net difficult get ahead for my ethnic group table
+##
+
+net_ethnic_getahead <- BAME3 %>%
+  select(ethnicity, ethnic_background_difficult_ahead2) %>%
+  filter(!is.na(ethnic_background_difficult_ahead2)) %>%
+  group_by(ethnicity) %>%
+   summarize (prop_1 = sum(ethnic_background_difficult_ahead2 == 1) / n() * 100,
+             prop_0 = sum(ethnic_background_difficult_ahead2 == 0) / n() * 100,
+             prop_2 = sum(ethnic_background_difficult_ahead2 == 2) / n() * 100)
+
+
+
+## creat dataset in long for group bar chart ## 
+net_ethnic_getahead_long <- pivot_longer(net_ethnic_getahead, cols = c(prop_1, prop_0, prop_2), names_to = "Response", values_to = "Proportion")
+
+# Create the grouped bar chart
+# Create the grouped bar chart
+ggplot(net_ethnic_getahead_long, aes(x = ethnicity, y = Proportion, fill = Response)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), color = "black") +
+  scale_fill_manual(values = c("blue", "orange", "red"), name = "Response",
+                    breaks = c("prop_1", "prop_0", "prop_2"),
+                    labels = c("Agree", "Neither Agree Nor Disagree", "Disagree")) +
+  labs(title = "My Etnic Background Has Made it Diffciult for Me to Get Ahead",
+       x = "Ethnicity",
+       y = "Proportion (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+## Certain minority groups are doing well in the UK -even better than white Britons 
+## assign a all agree and strongly agree a value of 1 strongly disagree and disagree value of 0  then subtract the values to get #
+
+BAME3 <- BAME3 %>%
+  mutate(
+    minoritygroups_doing_well_2 = case_when(
+        minoritygroups_doing_well == "Strongly agree" ~ "1",
+        minoritygroups_doing_well==  "Somewhat agree" ~ "1",
+        minoritygroups_doing_well == "Neither agree nor disagree" ~ "0",
+        minoritygroups_doing_well == "Somewhat disagree" ~ "2",
+        minoritygroups_doing_well == "Strongly diagree" ~ "2",
+        minoritygroups_doing_well== "Don't know" ~ NA_character_, 
+        minoritygroups_doing_well == "Don‚Äôt know" ~ NA_character_, 
+      TRUE ~ as.character(minoritygroups_doing_well)))
+
+BAME3$minoritygroups_doing_well_2 <- as.numeric(as.character(BAME3$minoritygroups_doing_well_2))
+
+```
+
+```{r}
+net_minority_doing_well <- BAME3 %>%
+  select(ethnicity, minoritygroups_doing_well_2) %>%
+  filter(!is.na(minoritygroups_doing_well_2)) %>%
+  group_by(ethnicity) %>%
+  summarize (prop_1 = sum(minoritygroups_doing_well_2 == 1) / n() * 100,
+             prop_0 = sum(minoritygroups_doing_well_2 == 0) / n() * 100, 
+             prop_2 = sum(minoritygroups_doing_well_2 == 2) / n() *100)
+        
+
+## creat dataset in long for group bar chart ## 
+net_minority_doing_well_long <- pivot_longer(net_minority_doing_well, cols = c(prop_1, prop_0, prop_2), names_to = "Response", values_to = "Proportion")
+
+# Create the grouped bar chart
+
+ggplot(net_minority_doing_well_long, aes(x = ethnicity, y = Proportion, fill = Response)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), color = "black") +
+  scale_fill_manual(values = c("blue", "orange", "red"), name = "Response",
+                    breaks = c("prop_1", "prop_0", "prop_2"),
+                    labels = c("Agree", "Neither Agree Nor Disagree", "Disagree")) +
+  labs(title = "Certain Minority Groups Have Done Well in Britain, even more so than White Britons",
+       x = "Ethnicity",
+       y = "Proportion (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+
+## Britain is great exapmple of a multi-racial democracy ## 
+## assign a all agree and strongly agree a value of 1 strongly disagree and disagree value of 0  then subtract the values to get #
+
+BAME3 <- BAME3 %>%
+  mutate(
+    britain_racial_democracy_2 = case_when(
+        britain_racial_democracy == "Strongly agree" ~ "1",
+        britain_racial_democracy == "Somewhat agree" ~ "1",
+        britain_racial_democracy == "Neither agree nor disagree" ~ "0",
+        britain_racial_democracy == "Somewhat disagree" ~ "2",
+        britain_racial_democracy == "Strongly disagree" ~ "2",
+        britain_racial_democracy== "Don't know" ~ NA_character_, 
+        britain_racial_democracy == "Don‚Äôt know" ~ NA_character_, 
+      TRUE ~ as.character(britain_racial_democracy)))
+
+
+BAME3$britain_racial_democracy_2 <- as.numeric(as.character(BAME3$britain_racial_democracy_2))
+
+```
+
+```{r}
+
+## net values table for Britain scessful multi-racial democracy 
+net_britain_racial_democracy <- BAME3 %>%
+  select(ethnicity, britain_racial_democracy_2) %>%
+  filter(!is.na(britain_racial_democracy_2)) %>%
+  group_by(ethnicity) %>%
+summarize (prop_1 = sum(britain_racial_democracy_2 == 1) / n() * 100,
+             prop_0 = sum(britain_racial_democracy_2 == 0) / n() * 100,
+            prop_2 = sum(britain_racial_democracy_2 == 2) / n() * 100)
+
+
+
+## create dataset in long for group bar chart ## 
+net_britain_racial_democracy_long <- pivot_longer(net_britain_racial_democracy, cols = c(prop_1, prop_0, prop_2), names_to = "Response", values_to = "Proportion")
+
+
+ggplot(net_britain_racial_democracy_long, aes(x = ethnicity, y = Proportion, fill = Response)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), color = "black") +
+  scale_fill_manual(values = c("blue", "orange", "red"), name = "Response",
+                    breaks = c("prop_1", "prop_0", "prop_2"),
+                    labels = c("Agree", "Neither Agree Nor Disagree", "Disagree")) +
+  labs(title = "Britain is A Great Example of A Racial Democracy",
+       x = "Ethnicity",
+       y = "Proportion (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+## Diversity at top of UK gvmt is a good thing ## 
+
+BAME3 <- BAME3 %>%
+  mutate(
+    diversity_uk_positive_2 = case_when(
+        diversity_uk_positive == "Strongly agree" ~ "1",
+        diversity_uk_positive == "Somewhat agree" ~ "1",
+        diversity_uk_positive == "Neither agree nor disagree" ~ "0",
+        diversity_uk_positive == "Somewhat disagree" ~ "2",
+        diversity_uk_positive == "Strongly diagree" ~ "2",
+        diversity_uk_positive == "Don't know" ~ NA_character_, 
+        diversity_uk_positive == "Don‚Äôt know" ~ NA_character_, 
+      TRUE ~ as.character(diversity_uk_positive)))
+
+BAME3$diversity_uk_positive_2 <- as.numeric(as.character(BAME3$diversity_uk_positive_2))
+
+```
+
+```{r} 
+## net values table for diversity at top of UK gvmt is good ## 
+net_diversity_uk_positive <- BAME3 %>%
+  select(ethnicity, diversity_uk_positive_2) %>%
+  filter(!is.na(diversity_uk_positive_2)) %>%
+  group_by(ethnicity) %>%
+        summarize (prop_1 = sum(diversity_uk_positive_2 == 1) / n() * 100,
+                   prop_0 = sum(diversity_uk_positive_2 == 0) / n() * 100,
+                   prop_2 = sum (diversity_uk_positive_2 == 2) / n() *100)
+
+
+## create dataset in long for group bar chart ## 
+net_diversity_uk_positive_long <- pivot_longer(net_diversity_uk_positive, cols = c(prop_1, prop_0, prop_2), names_to = "Response", values_to = "Proportion")
+
+# Create the grouped bar chart
+ggplot(net_diversity_uk_positive_long, aes(x = ethnicity, y = Proportion, fill = Response)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), color = "black") +
+  scale_fill_manual(values = c("blue", "orange", "red"), name = "Response",
+                    breaks = c("prop_1", "prop_0", "prop_2"),
+                    labels = c("Agree", "Neither Agree Nor Disagree", "Disagree")) +
+  labs(title = "The Diversity at the Top of the UK Government is a Positive Thing Which Signals Real Change Has Been Made",
+       x = "Ethnicity",
+       y = "Proportion (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+## The values of some ethnic minority communites are the one's which Britain needs ## 
+
+BAME3 <- BAME3 %>%
+  mutate(
+    ethnic_minority_values_good_2 = case_when(
+        ethnic_minority_values_good == "Strongly agree" ~ "1",
+        ethnic_minority_values_good == "Somewhat agree" ~ "1",
+        ethnic_minority_values_good == "Neither agree nor disagree" ~ "0",
+        ethnic_minority_values_good == "Somewhat agree" ~ "2",
+        ethnic_minority_values_good == "Strongly disagree" ~ "2",
+        ethnic_minority_values_good == "Don't know" ~ NA_character_, 
+        ethnic_minority_values_good == "Don‚Äôt know" ~ NA_character_, 
+      TRUE ~ as.character(ethnic_minority_values_good)))
+
+BAME3$ethnic_minority_values_good_2 <- as.numeric(as.character(BAME3$ethnic_minority_values_good_2))
+
+```
+
+```{r} 
+## net values table for ethnic minority values are good for Britain ## 
+
+net_ethnic_minority_values_good <- BAME3 %>%
+  select(ethnicity, ethnic_minority_values_good_2) %>%
+  filter(!is.na(ethnic_minority_values_good_2)) %>%
+  group_by(ethnicity) %>%
+     summarize(prop_1 = sum(ethnic_minority_values_good_2 == 1) / n() * 100,
+             prop_0 = sum(ethnic_minority_values_good_2 == 0) / n() * 100, 
+             prop_2 = sum(ethnic_minority_values_good_2 == 2) / n() * 100)
+
+
+
+## create dataset in long for group bar chart ## 
+net_ethnic_minority_values_good_long <- pivot_longer(net_ethnic_minority_values_good, cols = c(prop_1, prop_0, prop_2), names_to = "Response", values_to = "Proportion")
+
+
+ggplot(net_ethnic_minority_values_good_long, aes(x = ethnicity, y = Proportion, fill = Response)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), color = "black") +
+  scale_fill_manual(values = c("blue", "orange", "red"), name = "Response",
+                    breaks = c("prop_1", "prop_0", "prop_2"),
+                    labels = c("Agree", "Neither Agree Nor Disagree", "Disagree")) +
+  labs(title = "The values of some ethnic minority communities are ones that Britain increasingly needs\n - hard work, resilience, respect for family and patriotism",
+       x = "Ethnicity",
+       y = "Proportion (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+```{r}
+## Q9. Would say the follwoing sitation occurs more, less, or sacme compared to 5 years ago ##
+### crate optimistic pesimistic statemnts ## 
+## Racist abuse off line worse or better than 5 yars ago ##
+## racist off-line ##
+BAME3 <- BAME3 %>%
+  mutate(
+    fiveyears_ago_racist_offline_2 = case_when(
+        fiveyears_ago_racist_offline == "Has never happened to me" ~ "2",
+        fiveyears_ago_racist_offline == "Less now" ~ "2",
+        fiveyears_ago_racist_offline == "More now" ~ "1",
+        fiveyears_ago_racist_offline == "About the same" ~ "0",
+        fiveyears_ago_racist_offline == "Don't know" ~ NA_character_, 
+        fiveyears_ago_racist_offline == "Don‚Äôt know" ~ NA_character_, 
+      TRUE ~ as.character(fiveyears_ago_racist_offline)))
+
+BAME3$fiveyears_ago_racist_offline_2 <- as.numeric(as.character(BAME3$fiveyears_ago_racist_offline_2))
+
+```
+
+```{r}
+
+net_fiveyears_ago_racist_offline <- BAME3 %>%
+  select(ethnicity, fiveyears_ago_racist_offline_2) %>%
+  filter(!is.na(fiveyears_ago_racist_offline_2)) %>%
+  group_by(ethnicity) %>%
+  summarize (prop_1 = sum(fiveyears_ago_racist_offline_2 == 1) / n() * 100,
+             prop_2 = sum(fiveyears_ago_racist_offline_2 == 2) / n() * 100,
+             prop_0 = sum(fiveyears_ago_racist_offline_2 == 0) / n() * 100)
+
+# Create long-format dataset for grouped bar chart
+net_fiveyears_ago_racist_offline_long <- pivot_longer(net_fiveyears_ago_racist_offline, cols = c(prop_1, prop_0, prop_2), 
+                                                      names_to = "Response", 
+                                                      values_to = "Proportion")
+
+
+ggplot(net_fiveyears_ago_racist_offline_long, aes(x = ethnicity, y = Proportion, fill = Response)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), color = "black") +
+  scale_fill_manual(values = c("blue", "orange", "red"), name = "Response",
+                    breaks = c("prop_1", "prop_0", "prop_2"),
+                    labels = c("More Now", "About the Same", "Never Any/Less")) +
+  labs(title = "How Much Racist Abuse is There Offline Now Compared to Five Years Ago",
+       x = "Ethnicity",
+       y = "Proportion (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+## crtoss tab with the four categories ## 
+
+BAME3 <- BAME3 %>%
+  filter(!is.na(fiveyears_ago_racist_offline)) %>%
+  mutate(
+    fiveyears_ago_racist_offline_3 = case_when(
+      fiveyears_ago_racist_offline == "Has never happened to me" ~ "1",
+      fiveyears_ago_racist_offline == "Less now" ~ "2",
+      fiveyears_ago_racist_offline == "More now" ~ "3",
+      fiveyears_ago_racist_offline == "About the same" ~ "4",
+      fiveyears_ago_racist_offline == "Don't know" ~ NA_character_,
+      fiveyears_ago_racist_offline == "Don’t know" ~ NA_character_,
+      TRUE ~ as.character(fiveyears_ago_racist_offline)))
+
+# Convert "NA" strings to NA
+BAME3$fiveyears_ago_racist_offline_3[BAME3$fiveyears_ago_racist_offline_3 == "NA"] <- NA
+
+# Convert to numeric
+BAME3$fiveyears_ago_racist_offline_3 <- as.numeric(BAME3$fiveyears_ago_racist_offline_3)
+
+
+table_counts <- table(BAME3$ethnicity, BAME3$fiveyears_ago_racist_offline_3)
+
+# Calculate proportions within each level of ethnicity
+prop_table <- prop.table(table_counts, margin = 1) # margin = 1 for row-wise proportions
+
+# Display the proportions
+print(prop_table)
+  
+
+ 
+```
+
+
+```{r}
+## check ## 
+
+arab_check<- BAME3 %>% dplyr::select (ethnicity, fiveyears_ago_racist_offline) %>%
+  filter (ethnicity == "Arab") %>%
+  group_by(ethnicity) %>% 
+  filter(!(fiveyears_ago_racist_offline=="Don‚Äôt know" | fiveyears_ago_racist_offline=="Don't know"))
+  
+table(arab_check$fiveyears_ago_racist_offline)
+  
+```
+
+```{r}
+
+## Racist abuse off-line ## 
+## crate net- satement ## 
+
+
+BAME3 <- BAME3 %>%
+  mutate(
+    fiveyears_ago_racist_online_2 = case_when(
+        fiveyears_ago_racist_online == "Has never happened to me" ~ "2",
+        fiveyears_ago_racist_online == "Less now" ~ "2",
+        fiveyears_ago_racist_online == "More now" ~ "1",
+        fiveyears_ago_racist_online == "About the same" ~ "0",
+        fiveyears_ago_racist_online == "Don't know" ~ NA_character_, 
+        fiveyears_ago_racist_online == "Don‚Äôt know" ~ NA_character_, 
+      TRUE ~ as.character(fiveyears_ago_racist_offline)))
+
+BAME3$fiveyears_ago_racist_online_2 <- as.numeric(as.character(BAME3$fiveyears_ago_racist_online_2))
+```
+
+```{r}
+## graph for online abuse more or less than five years ago
+net_fiveyears_ago_racist_online <- BAME3 %>%
+  select(ethnicity, fiveyears_ago_racist_online_2) %>%
+  filter(!is.na(fiveyears_ago_racist_online_2)) %>%
+  group_by(ethnicity) %>%
+  summarize (prop_1 = sum(fiveyears_ago_racist_online_2 == 1) / n() * 100,
+             prop_0 = sum(fiveyears_ago_racist_online_2 == 0) / n() * 100,
+             prop_2 = sum(fiveyears_ago_racist_online_2 == 2) / n() *100)
+
+# Create long-format dataset for grouped bar chart
+net_fiveyears_ago_racist_online_long <- pivot_longer(net_fiveyears_ago_racist_online, cols = c(prop_1, prop_0, prop_2), 
+                                                      names_to = "Response", 
+                                                      values_to = "Proportion")
+
+# Create the grouped bar chart
+
+ggplot(net_fiveyears_ago_racist_online_long, aes(x = ethnicity, y = Proportion, fill = Response)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), color = "black") +
+  scale_fill_manual(values = c("blue", "orange", "red"), name = "Response",
+                    breaks = c("prop_1", "prop_0", "prop_2"),
+                    labels = c("More Now", "About the Same", "Never Any/Less")) +
+  labs(title = "How Much Racist Abuse is there Online Now Compared to Five Year Ago",
+       x = "Ethnicity",
+       y = "Proportion (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+```{r}
+## Five yeras ago there were not people who looked like me on TV ##
+
+
+BAME3 <- BAME3 %>%
+  mutate(
+    fiveyears_ago_like_me_tv_2 = case_when(
+        fiveyears_ago_like_me_tv == "Has never happened to me" ~ "2",
+        fiveyears_ago_like_me_tv == "Less Now" ~ "2",
+        fiveyears_ago_like_me_tv == "More now" ~ "1",
+        fiveyears_ago_like_me_tv == "About the same" ~ "0",
+        fiveyears_ago_like_me_tv == "Don't know" ~ NA_character_, 
+        fiveyears_ago_like_me_tv == "Don‚Äôt know" ~ NA_character_, 
+      TRUE ~ as.character(fiveyears_ago_like_me_tv)))
+
+BAME3$fiveyears_ago_like_me_tv_2 <- as.numeric(as.character(BAME3$fiveyears_ago_like_me_tv_2))
+```
+
+```{r}
+## graph for people who look like me on tv five years ago
+net_fiveyears_ago_like_me_tv <- BAME3 %>%
+  select(ethnicity, fiveyears_ago_like_me_tv_2) %>%
+  filter(!is.na(fiveyears_ago_like_me_tv_2)) %>%
+  group_by(ethnicity) %>%
+  summarize (prop_1 = sum(fiveyears_ago_like_me_tv_2 == 1) / n() * 100,
+             prop_0 = sum(fiveyears_ago_like_me_tv_2 == 0) / n() * 100,
+             prop_2 = sum(fiveyears_ago_like_me_tv_2 == 0) / n() * 100)
+
+# Create long-format dataset for grouped bar chart
+net_fiveyears_ago_like_me_tv_long <- pivot_longer(net_fiveyears_ago_like_me_tv, cols = c(prop_1, prop_0, prop_2), 
+                                                      names_to = "Response", 
+                                                      values_to = "Proportion")
+
+
+
+
+# Create the grouped bar chart
+
+ggplot(net_fiveyears_ago_like_me_tv_long, aes(x = ethnicity, y = Proportion, fill = Response)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), color = "black") +
+  scale_fill_manual(values = c("blue", "orange", "red"), name = "Response",
+                    breaks = c("prop_1", "prop_0", "prop_2"),
+                    labels = c("More Now", "About the Same", "Never Any/Less")) +
+  labs(title = "Compared to Five Years Ago, are you More or Less Likely\n to See People Who Look Like You on TV",
+       x = "Ethnicity",
+       y = "Proportion (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+```{r}
+## Convert to numeric statement that less likely to see pople like me in power ## 
+
+BAME3 <- BAME3 %>%
+  mutate(
+    fiveyears_ago_like_me_power_2 = case_when(
+        fiveyears_ago_like_me_power == "Has never happened to me" ~ "2",
+        fiveyears_ago_like_me_power == "Less now" ~ "2",
+        fiveyears_ago_like_me_power == "More now" ~ "1",
+        fiveyears_ago_like_me_power == "About the same" ~ "0",
+        fiveyears_ago_like_me_power == "Don't know" ~ NA_character_, 
+        fiveyears_ago_like_me_power == "Don‚Äôt know" ~ NA_character_, 
+      TRUE ~ as.character(fiveyears_ago_like_me_power)))
+
+BAME3$fiveyears_ago_like_me_power_2 <- as.numeric(BAME3$fiveyears_ago_like_me_power_2)
+
+```
+
+```{r}
+## create graph for five years less/ more likely to see people like me in positions of power ##
+
+## graph for online abuse more or less than five years ago
+net_fiveyears_ago_like_me_power <- BAME3 %>%
+  dplyr::select(ethnicity, fiveyears_ago_like_me_power_2) %>%
+  filter(!is.na(fiveyears_ago_like_me_power_2)) %>%
+  group_by(ethnicity) %>%
+  summarize (prop_1 = sum(fiveyears_ago_like_me_power_2 == 1) / n() * 100,
+             prop_0 = sum(fiveyears_ago_like_me_power_2 == 0) / n() * 100,
+             prop_2 = sum(fiveyears_ago_like_me_power_2 ==2) /n() *100)
+
+# Create long-format dataset for grouped bar chart
+net_fiveyears_ago_like_me_power_long <- pivot_longer(net_fiveyears_ago_like_me_power, cols = c(prop_1, prop_0, prop_2), 
+                                                      names_to = "Response", 
+                                                      values_to = "Proportion")
+
+
+
+ggplot(net_fiveyears_ago_like_me_power_long, aes(x = ethnicity, y = Proportion, fill = Response)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), color = "black") +
+  scale_fill_manual(values = c("blue", "orange", "red"), name = "Response",
+                    breaks = c("prop_1", "prop_0", "prop_2"),
+                    labels = c("More Now", "About the Same", "Never Any/Less")) +
+  labs(title = "Compared to Five Years Ago, are you More or Less Likely to See People Who Look Like You on TV",
+       x = "Ethnicity",
+       y = "Proportion (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+
+## Convert to numeric statement that people are more / less likelyto be suspicous of people who look like me  ## 
+
+BAME3 <- BAME3 %>%
+  mutate(
+    fiveyears_ago_suspicious_me_2 = case_when(
+        fiveyears_ago_suspcious_me == "Has never happened to me" ~ "2",
+         fiveyears_ago_suspcious_me == "Less now" ~ "2",
+         fiveyears_ago_suspcious_me == "More now" ~ "1",
+        fiveyears_ago_suspcious_me == "About the same" ~ "0",
+        fiveyears_ago_suspcious_me == "Don't know" ~ NA_character_, 
+        fiveyears_ago_suspcious_me == "Don‚Äôt know" ~ NA_character_, 
+      TRUE ~ as.character(fiveyears_ago_suspcious_me)))
+
+BAME3$fiveyears_ago_suspicious_me_2 <- as.numeric(as.character(BAME3$fiveyears_ago_suspicious_me_2))
+```
+
+```{r}
+
+## graph for five years ago people were more likely to look at me suspicously
+net_fiveyears_ago_suspicious_me_2 <- BAME3 %>%
+  select(ethnicity, fiveyears_ago_suspicious_me_2) %>%
+  filter(!is.na(fiveyears_ago_suspicious_me_2)) %>%
+  group_by(ethnicity) %>%
+  summarize (prop_1 = sum(fiveyears_ago_suspicious_me_2 == 1) / n() * 100,
+             prop_0 = sum(fiveyears_ago_suspicious_me_2 == 0) / n() * 100,
+             prop_2 = sum(fiveyears_ago_suspicious_me_2 == 2) / n() * 100)  
+
+# Create long-format dataset for grouped bar chart
+net_fiveyears_ago_suspicious_long <- pivot_longer(net_fiveyears_ago_suspicious_me_2, cols = c(prop_1, prop_0, prop_2), 
+                                                      names_to = "Response", 
+                                                      values_to = "Proportion")
+
+
+
+ggplot(net_fiveyears_ago_suspicious_long, aes(x = ethnicity, y = Proportion, fill = Response)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), color = "black") +
+  scale_fill_manual(values = c("blue", "orange", "red"), name = "Response",
+                    breaks = c("prop_1", "prop_0", "prop_2"),
+                    labels = c("More Now", "About the Same", "Never Any/Less")) +
+  labs(title = "Compared to Five Years Ago, are People More or Less Likely To Act\n Like They are Suspicious of You",
+       x = "Ethnicity",
+       y = "Proportion (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+## Convert to numeric statement five Years racist jokes ## 
+
+BAME3 <- BAME3 %>%
+  mutate(
+    fiveyears_ago_racist_jokes_2 = case_when(
+        fiveyears_ago_racist_jokes == "Has never happened to me" ~ "2",
+         fiveyears_ago_racist_jokes == "Less now" ~ "2",
+         fiveyears_ago_racist_jokes == "More now" ~ "1",
+        fiveyears_ago_racist_jokes == "About the same" ~ "0",
+        fiveyears_ago_racist_jokes == "Don't know" ~ NA_character_, 
+        fiveyears_ago_racist_jokes == "Don‚Äôt know" ~ NA_character_, 
+      TRUE ~ as.character(fiveyears_ago_racist_jokes)))
+
+BAME3$fiveyears_ago_racist_jokes_2 <- as.numeric(as.character(BAME3$fiveyears_ago_racist_jokes_2))
+
+```
+
+```{r}
+## graph for five years ago people were more or less likely to make racist jokes
+net_fiveyears_ago_racist_jokes <- BAME3 %>%
+  select(ethnicity, fiveyears_ago_racist_jokes_2) %>%
+  filter(!is.na(fiveyears_ago_racist_jokes_2)) %>%
+  group_by(ethnicity) %>%
+  summarize (prop_1 = sum(fiveyears_ago_racist_jokes_2 == 1) / n() * 100,
+             prop_0 = sum(fiveyears_ago_racist_jokes_2 == 0) / n() * 100,
+             prop_2 = sum(fiveyears_ago_racist_jokes_2 == 2) / n() * 100)
+# Create long-format dataset for grouped bar chart
+net_fiveyears_ago_racist_jokes_long <- pivot_longer(net_fiveyears_ago_racist_jokes, cols = c(prop_1, prop_0, prop_2), 
+                                                      names_to = "Response", 
+                                                      values_to = "Proportion")
+
+
+
+ggplot(net_fiveyears_ago_racist_jokes_long, aes(x = ethnicity, y = Proportion, fill = Response)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), color = "black") +
+  scale_fill_manual(values = c("blue", "orange", "red"), name = "Response",
+                    breaks = c("prop_1", "prop_0", "prop_2"),
+                    labels = c("More Now", "About the Same", "Never Any/Less")) +
+  labs(title = "Compared to Five Years Ago, are you More or Less Likely to Be\n Subject to Racial Slurs or Jokes",
+       x = "Ethnicity",
+       y = "Proportion (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+```{r}
+## By generation racist - abuse offfline ## 
+
+net_fiveyears_ago_racist_offline_generation <- BAME3 %>%
+  select(time_uk, fiveyears_ago_racist_offline_2, ethnicity) %>%
+  filter(!is.na(fiveyears_ago_racist_offline_2)) %>%
+  filter(!ethnicity=="White") %>%
+  group_by(time_uk) %>%
+  filter(time_uk %in% c("More than five years and less than ten years", 
+                          "Less than a year", 
+                          "More than forty years",
+                          "More than ten years and less than twenty years", 
+                          "More than two years and less than five years",
+                          "More than a year and less than two years",
+                          "More than twenty years and less than forty years")) %>%
+  summarize (prop_1 = sum(fiveyears_ago_racist_offline_2 == 1) / n() * 100,
+             prop_0 = sum(fiveyears_ago_racist_offline_2 == 0) / n() * 100)
+
+# Create long-format dataset for grouped bar chart
+net_fiveyears_ago_racist_offline_generation_long <- pivot_longer(net_fiveyears_ago_racist_offline_generation, cols = c(prop_1, prop_0), names_to = "Response", values_to = "Proportion")
+
+# Create the grouped bar chart
+ggplot(net_fiveyears_ago_racist_offline_generation_long, aes(x = time_uk, y = Proportion, fill = Response)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), color = "black") +
+  scale_fill_manual(values = c("blue", "red"), name = "Response",
+                    labels = c("More/Same", "Never Happened/Less")) +
+  labs(title = "How Much Racist Abuse Offline Is There Now Compared to Five Years Ago",
+       x = "Years in the UK",
+       y = "Proportion (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+
+```{r}
+## By generation racist abuse online ## 
+
+net_fiveyears_ago_racist_online_generation <- BAME3 %>%
+  select(time_uk, fiveyears_ago_racist_online_2, ethnicity) %>%
+  filter(!ethnicity=="White") %>%
+  filter(!is.na(fiveyears_ago_racist_online_2)) %>%
+  group_by(time_uk) %>%
+  filter(time_uk %in% c("More than five years and less than ten years", 
+                          "Less than a year", 
+                          "More than forty years",
+                          "More than ten years and less than twenty years", 
+                          "More than two years and less than five years",
+                          "More than a year and less than two years",
+                          "More than twenty years and less than forty years")) %>%
+  summarize (prop_1 = sum(fiveyears_ago_racist_online_2 == 1) / n() * 100,
+             prop_0 = sum(fiveyears_ago_racist_online_2 == 0) / n() * 100)
+
+# Create long-format dataset for grouped bar chart
+net_fiveyears_ago_racist_online_generation_long <- pivot_longer(net_fiveyears_ago_racist_online_generation, cols = c(prop_1, prop_0), names_to = "Response", values_to = "Proportion")
+
+# Create the grouped bar chart
+ggplot(net_fiveyears_ago_racist_online_generation_long, aes(x = time_uk, y = Proportion, fill = Response)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), color = "black") +
+  scale_fill_manual(values = c("blue", "red"), name = "Response",
+                    labels = c("More/Same", "Never Happened/Less")) +
+  labs(title = "How Much Racist Abuse Online Is There Now Compared to Five Years Ago",
+       x = "Years in the Uk",
+       y = "Proportion (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+## By generation - people like me on TV ##
+net_fiveyears_ago_like_me_tv_generation <- BAME3 %>%
+  select(time_uk, fiveyears_ago_like_me_tv_2, ethnicity) %>%
+  filter(!ethnicity=="White")
+  filter(!is.na(fiveyears_ago_like_me_tv_2)) %>%
+  group_by(time_uk) %>%
+  filter(time_uk %in% c("More than five years and less than ten years", 
+                          "Less than a year", 
+                          "More than forty years",
+                          "More than ten years and less than twenty years", 
+                          "More than two years and less than five years",
+                          "More than a year and less than two years",
+                          "More than twenty years and less than forty years")) %>%
+  summarize (prop_1 = sum(fiveyears_ago_like_me_tv_2 == 1) / n() * 100,
+             prop_0 = sum(fiveyears_ago_like_me_tv_2 == 0) / n() * 100)
+
+# Create long-format dataset for grouped bar chart
+net_fiveyears_ago_like_me_tv_generation_long <- pivot_longer(net_fiveyears_ago_like_me_tv_generation, cols = c(prop_1, prop_0), names_to = "Response", values_to = "Proportion")
+```
+
+```{r}
+
+# Create the generation grouped bar chart for people like me on tv 
+ggplot(net_fiveyears_ago_like_me_tv_generation_long, aes(x = time_uk, y = Proportion, fill = Response)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), color = "black") +
+  scale_fill_manual(values = c("blue", "red"), name = "Response",
+                    labels = c("More/Same", "Never Happened/Less")) +
+  labs(title = "Compared to Five Years Ago,  How Likely Are you to See People Like You on TV",
+       x = "Years in the UK",
+       y = "Proportion (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+```{r} 
+
+## People like me in power by generation##
+ 
+net_fiveyears_ago_like_me_power_generation <- BAME3 %>%
+ dplyr:: select(time_uk, fiveyears_ago_like_me_power_2, ethnicity) %>%
+  filter(!ethnicity=="White") %>%
+  filter(!is.na(fiveyears_ago_like_me_power_2)) %>%
+  group_by(time_uk) %>%
+  filter(time_uk %in% c("More than five years and less than ten years", 
+                          "Less than a year", 
+                          "More than forty years",
+                          "More than ten years and less than twenty years", 
+                          "More than two years and less than five years",
+                          "More than a year and less than two years",
+                          "More than twenty years and less than forty years")) %>%
+  summarize (prop_1 = sum(fiveyears_ago_like_me_power_2 == 1) / n() * 100,
+             prop_0 = sum(fiveyears_ago_like_me_power_2 == 0) / n() * 100)
+
+# Create long-format dataset for grouped bar chart
+fiveyears_ago_like_me_power_generation_long <- pivot_longer(net_fiveyears_ago_like_me_power_generation, cols = c(prop_1, prop_0), names_to = "Response", values_to = "Proportion")
+
+# Create the grouped bar chart
+ggplot(fiveyears_ago_like_me_power_generation_long, aes(x = time_uk, y = Proportion, fill = Response)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), color = "black") +
+  scale_fill_manual(values = c("blue", "red"), name = "Response",
+                    labels = c("More/Same", "Never Happened/Less")) +
+  labs(title = "Compared to Five Years Ago, How Likely Are You Too See People Like You\n in Positions of Power",
+       x = "Years in the UK",
+       y = "Proportion (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+## create table for suspcicious of peolple like me by generation  ## 
+
+net_fiveyears_ago_suspicious_me_generation <- BAME3 %>%
+ dplyr:: select(time_uk, fiveyears_ago_suspicious_me_2, ethnicity) %>%
+  filter(!ethnicity=="White") %>%
+  filter(!is.na(fiveyears_ago_suspicious_me_2)) %>%
+  group_by(time_uk) %>%
+  filter(time_uk %in% c("More than five years and less than ten years", 
+                          "Less than a year", 
+                          "More than forty years",
+                          "More than ten years and less than twenty years", 
+                          "More than two years and less than five years",
+                          "More than a year and less than two years",
+                          "More than twenty years and less than forty years")) %>%
+  summarize (prop_1 = sum(fiveyears_ago_suspicious_me_2 == 1) / n() * 100,
+             prop_0 = sum(fiveyears_ago_suspicious_me_2 == 0) / n() * 100)
+
+# Create long-format dataset for grouped bar chart
+fiveyears_ago_suspicious_me_generation_long <- pivot_longer(net_fiveyears_ago_suspicious_me_generation, cols = c(prop_1, prop_0), names_to = "Response", values_to = "Proportion")
+
+# Create the grouped bar chart
+ggplot(fiveyears_ago_suspicious_me_generation_long, aes(x = time_uk, y = Proportion, fill = Response)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), color = "black") +
+  scale_fill_manual(values = c("blue", "red"), name = "Response",
+                    labels = c("More/Same", "Never Happened/Less")) +
+  labs(title = "Compared to Five Years Ago, People Are More or Less Likely\n to be Suspicious of People Like Me",
+       x = "Years in the UK",
+       y = "Proportion (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+## create table for racist jokes by generation  ## 
+
+net_fiveyears_ago_racist_jokes_generation <- BAME3 %>%
+ dplyr:: select(time_uk, fiveyears_ago_racist_jokes_2, ethnicity) %>%
+  filter(!ethnicity=="Whte") %>%
+  filter(!is.na(fiveyears_ago_racist_jokes_2)) %>%
+  group_by(time_uk) %>%
+  filter(time_uk %in% c("More than five years and less than ten years", 
+                          "Less than a year", 
+                          "More than forty years",
+                          "More than ten years and less than twenty years", 
+                          "More than two years and less than five years",
+                          "More than a year and less than two years",
+                          "More than twenty years and less than forty years")) %>%
+  summarize (prop_1 = sum(fiveyears_ago_racist_jokes_2 == 1) / n() * 100,
+             prop_0 = sum(fiveyears_ago_racist_jokes_2 == 0) / n() * 100)
+
+# Create long-format dataset for grouped bar chart
+fiveyears_ago_racist_jokes_generation_long <- pivot_longer(net_fiveyears_ago_racist_jokes_generation, cols = c(prop_1, prop_0), names_to = "Response", values_to = "Proportion")
+
+# Create the grouped bar chart
+ggplot(fiveyears_ago_racist_jokes_generation_long, aes(x = time_uk, y = Proportion, fill = Response)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), color = "black") +
+  scale_fill_manual(values = c("blue", "red"), name = "Response",
+                    labels = c("More/Same", "Never Happened/Less")) +
+  labs(title = "Compared to Five Years Ago, People Are More or Less Likely to Tell Racist Jokes",
+       x = "Years in the UK",
+       y = "Proportion (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+## Q.9 Additional Analysis FOR questions  vote choice - progressive and not progressive based on view on race relations questions - Q52 & Q53 #
+## create binary DV for vote choice 
+    vote_views_race <-BAME3 %>%
+  dplyr::select(respondent_id, age, ethnicity, general_election_tmrw, gender, education, income, housing_status, working_status, religion, attention_politics_slider, race_relations_bad, ethnic_minority_values_good, minoritygroups_doing_well, ethnic_background_difficult_ahead, britain_racial_democracy, diversity_uk_positive, position_society_effort, immigration, crime, redistribution,lgbtq_rights,
+                discrimination_white, gvmt_benefits, overseas_aid, econgrowth_equality, fiveyears_ago_racist_jokes, fiveyears_ago_racist_online, fiveyears_ago_like_me_power, fiveyears_ago_suspcious_me, fiveyears_ago_like_me_tv, fiveyears_ago_racist_offline, rating_conservative, rating_labour) %>%
+    filter(general_election_tmrw %in% c("Liberal Democrats", 
+                          "The Labour Party", 
+                          "Green Party",
+                          "The Conservative Party", 
+                          "Scottish National Party (SNP)",
+                          "Scottish Nationalv Party",
+                          "Plaid Cymru",
+                          "Reform UK")) 
+
+```
+
+```{r}
+## check missing labour_rating for white respondents ## 
+
+
+
+# Filter out rows with missing values in the rating_labour variable
+BAME3_filtered <- BAME3 %>%
+  filter(!is.na(rating_labour))
+
+# Count occurrences of each ethnic group
+ethnicity_counts <- BAME3_filtered %>%
+  count(ethnicity)
+
+# View the resulting table
+print(ethnicity_counts)
+
+```
+
+```{r}
+
+## convert to numeric the racial opinion scores - more optimistic higher values - DV voting for Prgeissve Party  make that 1 an voting for Conservative = 0
+
+
+count_race_relations_bad <- count(vote_views_race, race_relations_bad)
+print(count_race_relations_bad)
+
+# Correct encoding issue for "Don't know"
+vote_views_race <- vote_views_race %>%
+  mutate(
+    race_relations_bad = ifelse(race_relations_bad %in% c("Don‚Äôt know", "Don't know"), "Don't know", race_relations_bad)
+  )
+
+# Recode race_relations_bad
+vote_views_race <- vote_views_race %>%
+  mutate(
+    race_relations_bad_2 = case_when(
+      race_relations_bad %in% c("Don't know") ~ NA_real_,
+      race_relations_bad == "Strongly disagree" ~ 1,
+      race_relations_bad == "Somewhat disagree" ~ 2,
+      race_relations_bad == "Neither agree nor disagree" ~ 3,
+      race_relations_bad == "Somewhat agree" ~ 4,
+      race_relations_bad == "Strongly agree" ~ 5,
+      TRUE ~ NA_real_  # For any other cases, set to NA
+    )
+  )
+
+# Check the counts after recoding
+table(vote_views_race$race_relations_bad_2, useNA = "always")
+
+
+## Ethnic background difficult to get ahead ## 
+
+vote_views_race <- vote_views_race %>%
+  mutate(
+    ethnic_background_difficult_ahead2 = case_when(
+      ethnic_background_difficult_ahead %in% c("Don't know", "Don‚Äôt know") ~ NA_real_,
+      ethnic_background_difficult_ahead == "Strongly disagree" ~ 1,
+      ethnic_background_difficult_ahead == "Somewhat disagree" ~ 2,
+      ethnic_background_difficult_ahead == "Neither agree nor disagree" ~ 3,
+      ethnic_background_difficult_ahead == "Somewhat agree" ~ 4,
+      ethnic_background_difficult_ahead == "Strongly agree" ~ 5,
+      TRUE ~ NA_real_  # For any other cases, set to NA
+    )
+  )
+
+## Minority groups doing well ## 
+
+vote_views_race <- vote_views_race %>%
+  mutate(
+    minoritygroups_doing_well_2 = case_when(
+      minoritygroups_doing_well %in% c("Don't know", "Don‚Äôt know") ~ NA_real_,
+      minoritygroups_doing_well == "Strongly disagree" ~ 5,
+      minoritygroups_doing_well == "Somewhat disagree" ~ 4,
+      minoritygroups_doing_well == "Neither agree nor disagree" ~ 3,
+      minoritygroups_doing_well == "Somewhat agree" ~ 2,
+      minoritygroups_doing_well == "Strongly agree" ~ 1,
+      TRUE ~ NA_real_  # For any other cases, set to NA
+    )
+  )
+
+## Britain is a great example of a multi-racial demoracy 
+
+
+vote_views_race <- vote_views_race %>%
+  mutate(
+      britain_racial_democracy_2 = case_when(
+      britain_racial_democracy %in% c("Don't know", "Don‚Äôt know") ~ NA_real_,
+      britain_racial_democracy == "Strongly disagree" ~ 5,
+      britain_racial_democracy == "Somewhat disagree" ~ 4,
+      britain_racial_democracy == "Neither agree nor disagree" ~ 3,
+      britain_racial_democracy == "Somewhat agree" ~ 2,
+      britain_racial_democracy == "Strongly agree" ~ 1,
+      TRUE ~ NA_real_  # For any other cases, set to NA
+    )
+  )
+
+
+## Diversity at top of UK government is a real positive whcih signals a real change ## 
+vote_views_race <- vote_views_race %>%
+  mutate(
+      diversity_uk_positive_2 = case_when(
+      diversity_uk_positive %in% c("Don't know", "Don‚Äôt know") ~ NA_real_,
+      diversity_uk_positive == "Strongly disagree" ~ 5,
+      diversity_uk_positive == "Somewhat disagree" ~ 4,
+      diversity_uk_positive == "Neither agree nor disagree" ~ 3,
+      diversity_uk_positive == "Somewhat agree" ~ 2,
+      diversity_uk_positive == "Strongly agree" ~ 1,
+      TRUE ~ NA_real_  # For any other cases, set to NA
+    )
+  )
+## Minority Values  values of Certain Ethnic Minorities - hard work, patritiosm, respect from family are ones that the UK increasingly needs ## 
+
+vote_views_race <- vote_views_race %>%
+  mutate(
+      ethnic_minority_values_good_2 = case_when(
+      ethnic_minority_values_good %in% c("Don't know", "Don‚Äôt know") ~ NA_real_,
+      ethnic_minority_values_good == "Strongly disagree" ~ 1,
+      diversity_uk_positive == "Somewhat disagree" ~ 2,
+      diversity_uk_positive == "Neither agree nor disagree" ~ 3,
+      diversity_uk_positive == "Somewhat agree" ~ 4,
+      diversity_uk_positive == "Strongly agree" ~ 5,
+      TRUE ~ NA_real_  # For any other cases, set to NA
+    )
+  )
+
+
+
+
+## check mutation worked correctly by looking at values on britain_racail_democracy pre and post mutation
+count_britain_racial_democracy <- count(vote_views_race, britain_racial_democracy)
+print(count_britain_racial_democracy)
+
+
+# Remove leading and trailing whitespace
+vote_views_race <- vote_views_race %>%
+  mutate(general_election_tmrw = str_trim(general_election_tmrw))
+
+# Check for NAs
+sum(is.na(vote_views_race$general_election_tmrw))
+
+# Apply mutation
+vote_views_race <- vote_views_race %>%
+  mutate(general_election_tmrw = case_when(
+    general_election_tmrw == "Scottish National Party" ~ "Scottish National Party (SNP)",
+    general_election_tmrw == "The Conservative Party" ~ "Conservatives", 
+    general_election_tmrw == "The Labour Party" ~ "Labour",
+    TRUE ~ general_election_tmrw))
+
+# Check data after mutation
+unique(vote_views_race$general_election_tmrw)
+## create binary for progressive / consevarative vote choice ## 
+
+vote_views_race <- vote_views_race %>%
+  mutate(general_election_tmrw_binary = case_when(
+    general_election_tmrw == "Scottish National Party (SNP)" ~ 1,
+    general_election_tmrw == "Liberal Democrats" ~ 0, 
+    general_election_tmrw == "Labour" ~ 1,
+    general_election_tmrw =="Green Party" ~ 1, 
+    general_election_tmrw == "Plaid Cymru" ~ 1, 
+    general_election_tmrw == "Conservatives" ~ 0,
+    general_election_tmrw == "Reform UK" ~ 0,
+    TRUE ~ as.numeric (general_election_tmrw))
+)
+
+## remove NAs from vote DV
+vote_views_race <- vote_views_race %>%
+  filter(!is.na(general_election_tmrw_binary), general_election_tmrw_binary %in% c(0, 1))
+
+
+## create index of racial attitudes 
+##vote_views_race$attitudes_index <- (vote_views_race$race_relations_bad_3 + vote_views_race$britain_racial_democracy + ##vote_views_race$minoritygroups_doing_well + vote_views_race$diversity_uk_positive + ##vote_views_race$ethnic_minority_values_good) / 5 
+
+
+# Remove rows with NAs in the racial_optimism_index variable
+
+#vote_views_race <- vote_views_race[!is.na(vote_views_race$attitudes_index), ]
+
+```
+
+```{r}
+
+## mutate the gender, education and age, polinterest, income relgiion, variables to factor and binary for regression model ## 
+
+vote_views_race <- vote_views_race %>%
+  mutate(gender_2 = if_else(gender == "Male",
+                            0,
+                            if_else(gender=="Other" | gender=="Prefer not to say",
+                                     NA_real_,
+                                     1)))
+                            
+                            
+vote_views_race <- vote_views_race %>%
+   mutate(immigration_2 = if_else(immigration == "Immigration has undermined British culture and society", 
+                                   0, 
+                                   if_else(is.na(immigration) | immigration == "Don't know", 
+                                           NA_real_, 
+                                           1)))
+
+
+# Convert gender_2 to a factor variable
+vote_views_race$gender_2 <- factor(vote_views_race$gender_2, levels = c(0, 1), labels = c("Male", "Female"))
+
+# Specify Female (coded as 1) as the reference level
+vote_views_race$gender_2 <- relevel(vote_views_race$gender_2, ref = "Male")
+ 
+
+## convert religion to factor variable 
+
+   vote_views_race$religion_2 <- factor(vote_views_race$religion, levels = c("Buddhist", "Christian", "Muslim", "Hindu", "No religion", "Sikh", "Any other religion", "Jewish"))
+
+   # Specify Buddhist as the reference level
+vote_views_race$religion_2 <- relevel(vote_views_race$religion_2, ref = "Buddhist")
+  
+
+## mutate age ##  
+   
+vote_views_race <- vote_views_race %>% 
+  mutate(age_2 = case_when(
+    age =="18 - 24" ~ 1,
+    age== "25 - 34" ~ 2, 
+    age =="35 - 44" ~ 3,
+    age == "45 - 54" ~ 4, 
+    age == "55 - 64" ~ 5, 
+    age == "65+" ~ 6,
+    TRUE ~ as.numeric(age))
+  )    
+  
+vote_views_race$age_2 <- as.factor((vote_views_race$age_2))
+
+# Specify "18 - 24" as the reference level
+vote_views_race$age_2 <- relevel(vote_views_race$age_2, ref = "1")
+
+
+vote_views_race <- vote_views_race %>%
+  mutate(education_2 = as.numeric(!str_detect(education, "^Below degree level")))
+
+vote_views_race$education_2 <- as.factor(vote_views_race$education_2)
+
+
+   # Specify No degree as the reference level
+vote_views_race$education_2 <- relevel(vote_views_race$education_2, ref = "0")
+
+## recode pol interest
+vote_views_race <- vote_views_race %>% 
+  mutate(pol_interest = case_when(
+    attention_politics_slider %in% c("8", "9", "10 - A huge amount") ~ 3,
+    attention_politics_slider %in% c("0", "0 - None") | 
+      (attention_politics_slider >= "0 - None" & attention_politics_slider <= "4")  ~ 1,  
+    attention_politics_slider >= "5" & attention_politics_slider <= "7" ~ 2, 
+    TRUE ~ as.numeric(attention_politics_slider)
+  ))
+
+    
+  vote_views_race$pol_interest <- as.factor(vote_views_race$pol_interest)
+  
+  
+   # Specify No interest as the reference level
+vote_views_race$pol_interest <- relevel(vote_views_race$pol_interest, ref = "1")
+
+### convert income variable ## 
+
+  vote_views_race <- vote_views_race %>% 
+    mutate(income = gsub("¬", "", income)) %>%
+  mutate(income_2 = case_when(
+     income == "Under £5,000 per year" ~ 1, 
+    income == "£10,000 to £14,999 per year" ~ 1,
+    income == "£15,000 to £19,999 per year" ~1,
+    income == "£20,000 to £24,999 per year" ~ 1,
+    income == "£25,000 to £29,999 per year" ~ 1,
+    income == "Prefer not to say" ~ 2, 
+    income == "£30,000 to £34,999 per year" ~2, 
+    income == "£35,000 to £39,999 per year" ~ 2, 
+    income == "£40,000 to £44,999 per year" ~2,
+    income == "£45,000 to £49,999 per year"  ~2,
+    income ==  "£50,000 to £59,999 per year" ~ 3, 
+    income ==  "£60,000 to £69,999 per year" ~3,
+    income ==  "£70,000 to £99,999 per year" ~ 4,
+    income == "£100,000 and over" ~5,
+    TRUE ~ as.numeric(income)
+  ))
+  
+    vote_views_race$income_2 <- as.factor(vote_views_race$income_2)
+    
+    
+   # Specify lowest income categry as  the reference level
+vote_views_race$income_2 <- relevel(vote_views_race$income_2, ref = "1")
+    
+```
+
+```{r} 
+
+
+## recode so that for the cultrue index we don't include  for minorities the immigration and and discrimination against whites variable - include it for whites  ## 
+
+## mutate attitdudinal variables ## 
+
+## create binary for person position in cime result of individaul effort #
+
+vote_views_race <- vote_views_race %>%
+  mutate(crime_2 = if_else(crime == "People who commit crimes do so because they‚Äôre fundamentally bad people" |
+                           crime == "People who commit crimes do so because they’re fundamentally bad people",
+                           0,
+                           if_else(is.na(crime) | crime == "Don't know",
+                                   NA_real_,
+                                   1)))
+
+# Convert position society to a factor variable
+vote_views_race$crime_2 <- factor(
+  vote_views_race$crime_2,
+  levels = c(0, 1),
+  labels = c(
+    "Crime because bad",
+    "Crime because no options"
+  )
+)
+
+# Specify F the reference level
+vote_views_race$crime_2 <- relevel(vote_views_race$crime_2, ref = "Crime because bad")
+
+vote_views_race$crime_numeric <- as.numeric(vote_views_race$crime_2) - 1
+
+
+
+# crate numeric for position in scoiety due to effort 
+
+vote_views_race <- vote_views_race %>%
+  mutate(position_society_effort_2 = if_else(position_society_effort == "A person‚Äôs position in society is mostly the result of individual effort" | 
+                      position_society_effort == "A person’s position in society is mostly the result of individual effort", 
+                                             0,
+                                            if_else(is.na(position_society_effort) | position_society_effort =="Don't know",
+                                                    NA_real_,
+                                                    1)))
+
+ 
+ # Convert position society to a factor variable
+ vote_views_race$position_society_effort_2 <- factor(
+   vote_views_race$position_society_effort_2,
+   levels = c(0, 1),
+   labels = c(
+     "Mostly individual effort",
+     "Not mostly individual effort"
+   )
+ )
+ 
+ # Specify F the reference level
+ vote_views_race$position_society_effort_2 <- relevel(vote_views_race$position_society_effort_2, ref = "Mostly individual effort")
+ 
+
+
+# Convert factor variable to numeric where "Mostly individual effort" is mapped to 0 and "Not mostly individual effort" is mapped to 1
+vote_views_race$position_society_effort_numeric <- as.numeric(vote_views_race$position_society_effort_2) - 1
+
+
+## Immigration ## 
+vote_views_race <- vote_views_race %>%
+   mutate(immigration_2 = if_else(immigration == "Immigration has undermined British culture and society", 
+                                   0, 
+                                   if_else(is.na(immigration) | immigration == "Don't know", 
+                                           NA_real_, 
+                                           1)))
+
+
+# Convert immigration to a factor variable
+vote_views_race$immigration_2 <- factor(
+   vote_views_race$immigration_2,
+   levels = c(0, 1),
+   labels = c(
+     "Immigration has undermined British culture and society",
+     "Immigration has enriched British culture and society"
+   )
+)
+
+prop.table(table(vote_views_race$ethnicity, vote_views_race$immigration), margin=1)
+
+# Specify the reference level
+vote_views_race$immigration_2 <- relevel(vote_views_race$immigration_2, ref = "Immigration has undermined British culture and society")
+
+vote_views_race$immigration_numeric <- as.numeric(vote_views_race$immigration_2) - 1
+
+
+## redistibrution
+vote_views_race <- vote_views_race %>%
+   mutate(redistribution_2 = if_else(redistribution=="The Government should not redistribute income as people have a right to decide what to do with their own money",
+                                     0,
+                                     if_else(is.na(redistribution) | redistribution =="Don't know",
+                                             NA_real_,
+                                             1)))
+          
+          
+          
+# Convert redistirbution to a factor variable
+vote_views_race$redistribution_2 <- factor(
+   vote_views_race$redistribution_2,
+   levels = c(0, 1),
+   labels = c(
+     "The Government should not redistribute income as people have a right to decide what to do with their own money",
+     "The Government should redistribute income from the better-off to those who are less well-off"
+   )
+)
+
+# Specify the reference level
+vote_views_race$redistribution_2 <- relevel(vote_views_race$redistribution_2, ref = "The Government should not redistribute income as people have a right to decide what to do with their own money")
+
+vote_views_race$redistribution_numeric <- as.numeric(vote_views_race$redistribution_2) - 1
+
+## lgbtq ##
+vote_views_race <- vote_views_race %>%
+   mutate(lgbtq_rights_2 = if_else(lgbtq_rights =="LGBTQ+ rights in this country have gone too far",
+                                                                                                  0,
+                                                                    if_else(is.na(lgbtq_rights) | lgbtq_rights =="Don't know",
+                                                                            NA_real_,
+                                                                            1)))
+# Convert LGBTQ to a factor variable
+vote_views_race$lgbtq_rights_2 <- factor(
+   vote_views_race$lgbtq_rights_2,
+   levels = c(0, 1),
+   labels = c(
+     "LGBTQ+ rights in this country have gone too far",
+     "LGBTQ+ rights have not gone far enough"
+   )
+)
+
+# Specify the reference level
+vote_views_race$lgbtq_rights_2 <- relevel(vote_views_race$lgbtq_rights_2, ref = "LGBTQ+ rights in this country have gone too far")
+
+vote_views_race$lgbtq_rights_numeric <- as.numeric(vote_views_race$lgbtq_rights_2) - 1
+
+### Overseas aid #
+
+vote_views_race <- vote_views_race %>%
+   mutate(overseas_aid_2 = if_else(overseas_aid =="The UK should cut spending on overseas aid to other countries", 0,
+                                   if_else(is.na(overseas_aid) | overseas_aid == "Don't know",
+                                           NA_real_,
+                                           1)))
+
+
+
+# Convert overseas to a factor variable
+vote_views_race$overseas_aid_2 <- factor(
+   vote_views_race$overseas_aid_2,
+   levels = c(0, 1),
+   labels = c(
+     "The UK should cut spending on overseas aid to other countries",
+     "The UK should increase spending on overseas aid to other countries"
+   )
+)
+
+# Specify the reference level
+vote_views_race$overseas_aid_2 <- relevel(vote_views_race$overseas_aid_2, ref = "The UK should cut spending on overseas aid to other countries")
+
+vote_views_race$overseas_aid_numeric <- as.numeric(vote_views_race$overseas_aid_2) - 1
+
+### Discrimination white #
+
+vote_views_race <- vote_views_race %>%
+   mutate(discrimination_white_2 = if_else(discrimination_white =="Discrimination against white people has become as big of a problem as discrimination against ethnic minorities",
+                                           0,
+                                           if_else(is.na(discrimination_white) | discrimination_white =="Don't know",
+                                                   NA_real_,
+                                                   1)))
+
+
+# Convert overseas to a factor variable
+vote_views_race$discrimination_white_2 <- factor(
+   vote_views_race$discrimination_white_2,
+   levels = c(0, 1),
+   labels = c(
+     "Discrimination against white people has become as big of a problem as discrimination against ethnic minorities",
+     "Discrimination against ethnic minorities continues to be far more significant than any discrimination against white people"
+   )
+)
+
+
+
+prop.table(table(vote_views_race$ethnicity, vote_views_race$discrimination_white), margin=1)
+
+# Specify the reference level
+vote_views_race$discrimination_white_2 <- relevel(vote_views_race$discrimination_white_2, ref = "Discrimination against ethnic minorities continues to be far more significant than any discrimination against white people")
+
+vote_views_race$discrimination_white_numeric <- as.numeric(vote_views_race$discrimination_white_2) - 1
+
+## Government Benefits ## 
+vote_views_race <- vote_views_race %>%
+   mutate(gvmt_benefits_2 = if_else(gvmt_benefits =="Government benefits are too readily available to people who have never contributed anything in return",
+                              0,
+                              if_else(is.na(gvmt_benefits) | gvmt_benefits =="Don't know",
+                                      NA_real_,
+                                      1)))
+
+
+
+# Convert gvmt benefits  to a factor variable
+vote_views_race$gvmt_benefits_2 <- factor(
+   vote_views_race$gvmt_benefits_2,
+   levels = c(0, 1),
+   labels = c(
+     "Government benefits are too readily available to people who have never contributed anything in return",
+     "People who are struggling to get by have a right to seek help from the Government"
+   )
+)
+
+# Specify the reference level
+vote_views_race$gvmt_benefits_2 <- relevel(vote_views_race$gvmt_benefits_2, ref = "Government benefits are too readily available to people who have never contributed anything in return")
+
+vote_views_race$gvmt_benefits_numeric <- as.numeric(vote_views_race$gvmt_benefits_2) - 1
+
+### Economic groth vs quality ## 
+ #
+vote_views_race <- vote_views_race %>%
+   mutate(econgrowth_equality_2 = if_else(econgrowth_equality =="The Government should focus on growing the size of the UK‚Äôs economy more than they should on sharing out wealth more equally" |
+                                            econgrowth_equality == "The Government should focus on growing the size of the UK’s economy more than they should on sharing out wealth more equally", 0, 
+                                          if_else(is.na(econgrowth_equality) | econgrowth_equality =="Don't know",
+                                                  NA_real_,
+                                                  1)))
+
+
+ 
+# Convert overseas to a factor variable
+vote_views_race$econgrowth_equality_2 <- factor(
+   vote_views_race$econgrowth_equality_2,
+   levels = c(0, 1),
+   labels = c(
+     "The Government should focus on growing the size of the UK‚Äôs economy more than they should on sharing out wealth more equally",
+     "The Government should focus on sharing out wealth more equally than they should on growing the size of the economy"
+   )
+)
+
+# Specify the reference level
+vote_views_race$econgrowth_equality_2 <- relevel(vote_views_race$econgrowth_equality_2, ref = "The Government should focus on growing the size of the UK‚Äôs economy more than they should on sharing out wealth more equally")
+
+vote_views_race$econgrowth_equality_numeric <- as.numeric(vote_views_race$econgrowth_equality_2) - 1
+```
+
+```{r}
+
+## create index of economic and culture values ## 
+
+## culture##
+vote_views_race$culture_index <- (
+  vote_views_race$crime_numeric + 
+  vote_views_race$lgbtq_rights_numeric + 
+  vote_views_race$overseas_aid_numeric +
+    vote_views_race$immigration_numeric +
+    vote_views_race$discrimination_white_numeric
+  ) 
+
+##vote_views_race$culture_index_white <- (
+##  vote_views_race$crime_numeric + 
+  ##vote_views_race$lgbtq_rights_numeric + 
+  ##vote_views_race$overseas_aid_numeric +
+  ##vote_views_race$discrimination_white_numeric + # Apr 12: check the coding
+  #vote_views_race$immigration_numeric
+  #) 
+
+## economic##
+vote_views_race$economic_index <- (
+  vote_views_race$gvmt_benefits_numeric +
+    vote_views_race$econgrowth_equality_numeric +
+    vote_views_race$redistribution_numeric +
+    vote_views_race $position_society_effort_numeric
+)
+
+
+
+```
+
+```{r}
+## create seperate data-frames for white and minority voters ## 
+
+vote_views_race_white <- vote_views_race %>%
+  filter(ethnicity=="White")
+
+vote_views_race_minority <- vote_views_race%>%
+  filter(!ethnicity=="White")
+```
+
+```{r}
+## run logistic regression model on views race and vote for progressive 
+# Run logistic regression models 
+
+
+
+## demographic model- white  ##
+vote_views_race_demographic_white_model <- glm(general_election_tmrw_binary ~ gender_2 + age_2 + education_2 + income_2 + religion_2, data = vote_views_race_white, family = binomial) 
+
+summary(vote_views_race_demographic_white_model)
+
+## demographic and non racial attitude variables ## 
+
+vote_views_race_demographic_attitudes_model_white <- glm(general_election_tmrw_binary ~  gender_2 + age_2 + education_2 + pol_interest + income_2 + religion_2 + culture_index + economic_index, data = vote_views_race_white, family = binomial)
+
+summary(vote_views_race_demographic_attitudes_model_white)
+
+vote_views_race_relations_bad_white <- glm(general_election_tmrw_binary ~  gender_2 + age_2 + education_2 + pol_interest + income_2 + religion_2 + culture_index + economic_index + race_relations_bad_2, data = vote_views_race_white, family = binomial)
+
+summary(vote_views_race_relations_bad_white)
+
+## Rename Coefficients##
+    modelsummary(vote_views_race_relations_bad_white,
+    coef_rename = c(
+               "gender_2Female" = "Female",
+               "age_22" = "25-34",
+               "age_23"= "35-44",
+               "age_24" = "45-54",
+               "age_25" = "55-64",
+               "age_26" =  "65+",
+               "education_21" = "Degree Level or Above",
+               "pol_interest2" = "Political Interest - Medium",
+               "pol_interest3" = "Political Interest - High",
+               "income_22" = "£30,000 - £49,999",
+               "income_23" = "£50,000 - £69,999",
+               "income_24" = "£70,000 - £99,999",
+               "income_25" = "£100,000+",
+               "religion_2Christian" = "Christian",
+               "religion_2Muslim" = "Muslim",
+               "religion_2Hindu" = "Hindu", 
+               "religion_2No religion" = "No Religion",
+               "religion_2Sikh" = "Sikh",
+               "religion_2Any other religion" = "Any Other Religion",
+               "religion_2Jewish" = "Jewish",
+               "culture_index" = "Socio-cultural Values",
+               "economic_index" = "Economic Values"))
+```
+               
+
+```{r}
+
+##  model for racial  attitudes ## 
+## race relations minority  voters ## 
+
+## demographic model- minority  ##
+vote_views_race_demographic_minority_model <- glm(general_election_tmrw_binary ~ gender_2 + age_2 + education_2 + income_2 + religion_2, data = vote_views_race_minority, family = binomial) 
+
+summary(vote_views_race_demographic_minority_model)
+
+## demographic and non racial attitude variables ## 
+
+vote_views_race_demographic_attitudes_minority_model <- glm(general_election_tmrw_binary ~  gender_2 + age_2 + education_2 + pol_interest + income_2 + religion_2 + culture_index + economic_index, data = vote_views_race_minority, family = binomial)
+
+summary(vote_views_race_demographic_attitudes_minority_model)
+
+## race relations bad minoirity voters 
+
+vote_views_race_relations_bad_minority <- glm(general_election_tmrw_binary ~  gender_2 + age_2 + education_2 + pol_interest + income_2 + religion_2 + culture_index + economic_index + race_relations_bad_2, data = vote_views_race_minority, family = binomial)
+
+summary(vote_views_race_relations_bad_minority)
+```
+
+```{r}
+#coeff_names <- c(.....)
+#modelsummary(vote_views_race, coef_rename=coeff_names)
+
+# Export Model Output for White and Minority Voters Race Relations Bad ## 
+modelsummary(vote_views_race_relations_bad_minority,
+             coef_rename = c(
+               "gender_2Female" = "Female",
+               "age_22" = "25-34",
+               "age_23"= "35-44",
+               "age_24" = "45-54",
+               "age_25" = "55-64",
+               "age_26" =  "65+",
+               "education_21" = "Degree Level or Above",
+               "pol_interest2" = "Political Interest - Medium",
+               "pol_interest3" = "Political Interest - High",
+               "income_22" = "£30,000 - £49,999",
+               "income_23" = "£50,000 - £69,999",
+               "income_24" = "£70,000 - £99,999",
+               "income_25" = "£100,000+",
+               "religion_2Christian" = "Christian",
+               "religion_2Muslim" = "Muslim",
+               "religion_2Hindu" = "Hindu", 
+               "religion_2No religion" = "No Religion",
+               "religion_2Sikh" = "Sikh",
+               "religion_2Any other religion" = "Any Other Religion",
+               "religion_2Jewish" = "Jewish",
+               "culture_index" = "Socio-cultural Values",
+               "economic_index" = "Economic Values"))
+```
+
+```{r}
+
+models_race_relations_bad <- list(
+                              "White" = vote_views_race_relations_bad_white <- glm(general_election_tmrw_binary ~  gender_2 + age_2 + education_2 + pol_interest + income_2 + religion_2 + culture_index + economic_index + race_relations_bad_2, data = vote_views_race_white, family = binomial),
+                              
+                            "Ethnic Minorities" = vote_views_race_relations_bad_minority <- glm(general_election_tmrw_binary ~  gender_2 + age_2 + education_2 + pol_interest + income_2 + religion_2 + culture_index + economic_index + race_relations_bad_2, data = vote_views_race_minority, family = binomial))
+
+
+# Define a custom function to rename coefficients
+rename_coefficients <- function(coef_names) {
+  # Define renaming logic
+  renamed_coefs <- coef_names
+  
+  # Rename coefficients based on predefined rules
+  renamed_coefs["gender_2Female"] <- "Female"
+  renamed_coefs["age_22"] <- "25-34"
+  renamed_coefs["age_23"] <- "35-44"
+  renamed_coefs["age_24"] <- "45-54"
+  renamed_coefs["age_25"] <- "55-64"
+  renamed_coefs["age_26"] <- "65+"
+  renamed_coefs["education_21"] <- "Degree Level or Above"
+  renamed_coefs["pol_interest2"] <- "Political Interest - Medium"
+  renamed_coefs["pol_interest3"] <- "Political Interest - High"
+  renamed_coefs["income_22"] <- "£30,000 - £49,999"
+  renamed_coefs["income_23"] <- "£50,000 - £69,999"
+  renamed_coefs["income_24"] <- "£70,000 - £99,999"
+  renamed_coefs["income_25"] <- "£100,000+"
+  renamed_coefs["religion_2Christian"] <- "Christian"
+  renamed_coefs["religion_2Muslim"] <- "Muslim"
+  renamed_coefs["religion_2Hindu"] <- "Hindu"
+  renamed_coefs["religion_2No religion"] <- "No Religion"
+  renamed_coefs["religion_2Sikh"] <- "Sikh"
+  renamed_coefs["religion_2Any other religion"] <- "Any Other Religion"
+  renamed_coefs["religion_2Jewish"] <- "Jewish"
+  renamed_coefs["culture_index"] <- "Socio-cultural Values"
+  renamed_coefs["economic_index"] <- "Economic Values"
+  renamed_coefs["race_relations_bad_2"] <- "View on Race Relations"
+  
+  return(renamed_coefs)
+}
+
+# Apply modelsummary with custom coefficient renaming function
+modelsummary (modesl_race_relations_bad,
+             coef_rename = rename_coefficients,
+             title = "The Effect of Thinking Race Relations Are Bad on Vote Choice",
+             align = c("l", "c", "r"),
+             stars = TRUE)
+
+```
+
+```{r}
+
+## produce predincted probability plot ## 
+
+
+##vote_views_race_relations_bad_white <- glm(general_election_tmrw_binary ~  gender_2 + age_2 + education_2 + pol_interest + income_2 + religion_2 + culture_index_white + economic_index + race_relations_bad_2, data = (vote_views_race %>% filter(ethnicity=="White")), family = binomial)
+
+##summary(vote_views_race_relations_bad_white)
+
+ethnic_predict_race_relations <- ggpredict(vote_views_race_relations_bad_minority, terms = "race_relations_bad_2", 
+          list = c(numeric= "mean", factor = "mode")) %>%
+  mutate(ethnicity="Minority") # 0 for ethnic
+
+white_predict_race_relations <- ggpredict(vote_views_race_relations_bad_white, terms = "race_relations_bad_2", 
+          list = c(numeric= "mean", factor = "mode")) %>%
+  mutate(ethnicity="White")
+
+combined_predict_reace_relations <- bind_rows(ethnic_predict_race_relations, white_predict_race_relations)
+
+
+## Predicted Probability Plot for race relations_bad ## 
+
+combined_predict %>%
+  ggplot(mapping = aes(x = x, y = predicted, color=ethnicity, fill=ethnicity)) +
+  geom_smooth(se = FALSE, size =1.25) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) + 
+  scale_x_continuous(limits = c(1, 5), breaks = 1:5) +
+  labs(title = "Likelihood of Voting For Left-Wing Party",
+       x = "View of State of Race Relations in the UK",
+       y = "Predicted Probability") + 
+  theme_minimal() + 
+  scale_fill_viridis_d() +
+  scale_colour_viridis_d()
+
+```
+
+```{r}
+## model for minority groups doing well - even better than white Britons -white voters  ##  Hihher values strongly disagree with statement minority grops doing well,even as much as white Britons
+
+minoritygroups_doing_well_white_model <- glm(general_election_tmrw_binary ~  gender_2 + age_2 + education_2 + pol_interest + income_2 + religion + culture_index + economic_index + minoritygroups_doing_well_2, data = vote_views_race_white, family = binomial)
+
+summary(minoritygroups_doing_well_white_model)
+
+## minority voters -  some minoirtiy groups doing as well as white Britons- hihger values SA
+minoritygroups_doing_well_minority_model <- glm(general_election_tmrw_binary ~  gender_2 + age_2 + education_2 + pol_interest + income_2 + religion + culture_index + economic_index + minoritygroups_doing_well_2, data = vote_views_race_minority, family = binomial)
+
+summary(minoritygroups_doing_well_minority_model)
+
+```
+
+```{r}
+
+## predicted Probability for Minority groups Doing Well -better than some Britons  ##
+
+ethnic_predict_minoritygroups_doing_well <- ggpredict(minoritygroups_doing_well_minority_model, terms = "minoritygroups_doing_well_2", 
+          list = c(numeric= "mean", factor = "mode")) %>%
+  mutate(ethnicity="Ethnic") # 0 for ethnic
+
+white_predict_minoritygroups_doing_well <- ggpredict(minoritygroups_doing_well_white_model, terms = "minoritygroups_doing_well_2", 
+          list = c(numeric= "mean", factor = "mode")) %>%
+  mutate(ethnicity="White")
+
+combined_predict_minoritygroups_doing_well <- bind_rows(ethnic_predict_minoritygroups_doing_well, white_predict_minoritygroups_doing_well)
+
+
+## Predicted Probability Plot  ## 
+
+combined_predict_minoritygroups_doing_well %>%
+  ggplot(mapping = aes(x = x, y = predicted, color=ethnicity, fill=ethnicity)) +
+  geom_smooth(se = FALSE, size =1.25) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) + 
+  scale_x_continuous(limits = c(1, 5), breaks = 1:5) +
+  labs(title = "Likelihood of Voting For Left-Wing Party",
+       x = "Belief that Certain Minority Groups are Doing Very Well in Briton - Even More So than White Britons",
+       y = "Predicted Probability") + 
+  theme_minimal() + 
+  scale_fill_viridis_d() +
+  scale_colour_viridis_d()
+```
+
+
+```{r}
+## Model for my Ethnic Background Has Made It Difficult to GEt Ahead ##  ## Higer values strong agree with the statment## 
+## Higer values strong agree
+ 
+ethnic_background_difficult_ahead_white_model <- glm(general_election_tmrw_binary ~  gender_2 + age_2 + education_2 + pol_interest + income_2 + religion + culture_index + economic_index + ethnic_background_difficult_ahead2, data = vote_views_race_white, family = binomial)
+
+summary(ethnic_background_difficult_ahead_white_model)
+
+
+## ethnic minoirity votes - my ethnicity has made it more difficult for me to get ahead ## 
+
+ethnic_background_difficult_ahead_minority_model <- glm(general_election_tmrw_binary ~  gender_2 + age_2 + education_2 + pol_interest + income_2 + religion + culture_index + economic_index + ethnic_background_difficult_ahead2, data = vote_views_race_minority, family = binomial)
+
+summary(ethnic_background_difficult_ahead_minority_model)
+```
+
+```{r}
+
+## predicted Probability for Minority groups Doing Well -better than some Britons  ##
+
+ethnic_predict_background_difficult_ahead <- ggpredict(ethnic_background_difficult_ahead_minority_model, terms = "ethnic_background_difficult_ahead2", 
+          list = c(numeric= "mean", factor = "mode")) %>%
+  mutate(ethnicity="Ethnic") # 0 for ethnic
+
+white_predict_background_difficult_ahead <- ggpredict(ethnic_background_difficult_ahead_white_model, terms = "ethnic_background_difficult_ahead2", 
+          list = c(numeric= "mean", factor = "mode")) %>%
+  mutate(ethnicity="White")
+
+combined_predict_background_difficult_ahead <- bind_rows(ethnic_predict_background_difficult_ahead, white_predict_background_difficult_ahead)
+
+
+## Predicted Probability Plot  ## 
+
+combined_predict_background_difficult_ahead %>%
+  ggplot(mapping = aes(x = x, y = predicted, color=ethnicity, fill=ethnicity)) +
+  geom_smooth(se = FALSE, size =1.25) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) + 
+  scale_x_continuous(limits = c(1, 5), breaks = 1:5) +
+  labs(title = "Likelihood of Voting For Left-Wing Party",
+       x = "Belief that Ethnic Background Has Made It Difficult to Get Ahead",
+       y = "Predicted Probability") + 
+  theme_minimal() + 
+  scale_fill_viridis_d() +
+  scale_colour_viridis_d()
+
+```
+
+```{r}
+## Britain is a great example of a multi-racial democracy ## Higher values are astrongngly disagree 
+## regression model ##
+
+
+britain_racial_democracy_white_model <- glm(general_election_tmrw_binary ~  gender_2 + age_2 + education_2 + pol_interest + income_2 + religion + culture_index + economic_index + britain_racial_democracy_2, data = vote_views_race_white, family = binomial)
+
+summary(britain_racial_democracy_white_model) 
+
+
+britain_racial_democracy_minority_model <- glm(general_election_tmrw_binary ~  gender_2 + age_2 + education_2 + pol_interest + income_2 + religion + culture_index + economic_index + britain_racial_democracy_2, data = vote_views_race_minority, family = binomial)
+
+summary(britain_racial_democracy_minority_model) 
+
+```
+
+
+```{r}
+# Predicted Probability Plot for Britain is a Great Example of a Multi-Racial Democracy ## 
+## predicted Probability for Minority groups Doing Well -better than some Britons  ##
+
+ethnic_predict_britain_racial_democracy <- ggpredict(britain_racial_democracy_minority_model, terms = "britain_racial_democracy_2", 
+          list = c(numeric= "mean", factor = "mode")) %>%
+  mutate(ethnicity="Ethnic") # 0 for ethnic
+
+white_predict_britain_racial_democracy <- ggpredict(britain_racial_democracy_white_model, terms = "britain_racial_democracy_2", 
+          list = c(numeric= "mean", factor = "mode")) %>%
+  mutate(ethnicity="White")
+
+combined_predict_background_britain_racial_democracy <- bind_rows(ethnic_predict_britain_racial_democracy, white_predict_britain_racial_democracy)
+
+
+## Predicted Probability Plot  ## 
+
+combined_predict_background_britain_racial_democracy %>%
+  ggplot(mapping = aes(x = x, y = predicted, color=ethnicity, fill=ethnicity)) +
+  geom_smooth(se = FALSE, size =1.25) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) + 
+  scale_x_continuous(limits = c(1, 5), breaks = 1:5) +
+  labs(title = "Likelihood of Voting For Left-Wing Party",
+       x = "Belief that Britain is A Great Example of Racial Democracy",
+       y = "Predicted Probability") + 
+  theme_minimal() + 
+  scale_fill_viridis_d() +
+  scale_colour_viridis_d()
+```
+
+
+```{r}
+## Diversity at the top of the UK gvmt is a sign that things are Improving ## ## higher  values string disagree ## 
+
+diversity_uk_white_model <- glm(general_election_tmrw_binary ~  gender_2 + age_2 + education_2 + pol_interest + income_2 + religion + culture_index + economic_index + diversity_uk_positive_2, data = vote_views_race_white, family = binomial)
+
+summary(diversity_uk_white_model)
+
+## ethnic minority voters ## 
+diversity_uk_minority_model <- glm(general_election_tmrw_binary ~  gender_2 + age_2 + education_2 + pol_interest + income_2 + religion + culture_index + economic_index + diversity_uk_positive_2, data = vote_views_race_minority, family = binomial)
+
+summary(diversity_uk_minority_model)
+```
+
+```{r}
+## Predicted probility plot
+ethnic_predict_diversity_uk <- ggpredict(diversity_uk_minority_model, terms = "diversity_uk_positive_2", 
+          list = c(numeric= "mean", factor = "mode")) %>%
+  mutate(ethnicity="Ethnic") # 0 for ethnic
+
+white_predict_diversity_uk <- ggpredict(diversity_uk_white_model, terms = "diversity_uk_positive_2", 
+          list = c(numeric= "mean", factor = "mode")) %>%
+  mutate(ethnicity="White")
+
+combined_predict_diversity_uk <- bind_rows(ethnic_predict_diversity_uk, white_predict_diversity_uk)
+
+
+## Predicted Probability Plot  ## 
+
+combined_predict_diversity_uk %>%
+  ggplot(mapping = aes(x = x, y = predicted, color=ethnicity, fill=ethnicity)) +
+  geom_smooth(se = FALSE, size =1.25) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) + 
+  scale_x_continuous(limits = c(1, 5), breaks = 1:5) +
+  labs(title = "Likelihood of Voting For Left-Wing Party",
+       x = "Diversity at the Top of UK Government is A Real Positivve Which Indicates Real Change",
+       y = "Predicted Probability") + 
+  theme_minimal() + 
+  scale_fill_viridis_d() +
+  scale_colour_viridis_d()
+```
+
+
+
+
+
+```{r}
+ ## Certain Values of Ethnic Minority Groups are the One's that UK Needs  ## Higher values stronly disagree ##
+minority_values_good_white_model <- glm(general_election_tmrw_binary ~  gender_2 + age_2 + education_2 + pol_interest + income_2 + religion + culture_index + economic_index + ethnic_minority_values_good_2, data = vote_views_race_white, family = binomial)
+
+summary(minority_values_good_white_model)
+
+
+minority_values_good_minority_model <- glm(general_election_tmrw_binary ~  gender_2 + age_2 + education_2 + pol_interest + income_2 + religion + culture_index + economic_index + ethnic_minority_values_good_2, data = vote_views_race_minority, family = binomial)
+
+summary(minority_values_good_minority_model)
+
+```
+
+```{r}
+## Predicted probility plot
+ethnic_predict_minority_values_good <- ggpredict(minority_values_good_minority_model, terms = "ethnic_minority_values_good_2", 
+          list = c(numeric= "mean", factor = "mode")) %>%
+  mutate(ethnicity="Ethnic") # 0 for ethnic
+
+white_predict_minority_values_good <- ggpredict(minority_values_good_white_model, terms = "ethnic_minority_values_good_2", 
+          list = c(numeric= "mean", factor = "mode")) %>%
+  mutate(ethnicity="White")
+
+combined_predict_minority_values_good <- bind_rows(ethnic_predict_minority_values_good, white_predict_minority_values_good)
+
+
+## Predicted Probability Plot  ## 
+
+combined_predict_minority_values_good %>%
+  ggplot(mapping = aes(x = x, y = predicted, color=ethnicity, fill=ethnicity)) +
+  geom_smooth(se = FALSE, size =1.25) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) + 
+  scale_x_continuous(limits = c(1, 5), breaks = 1:5) +
+  labs(title = "Likelihood of Voting For Left-Wing Party",
+       x = "Values of Certain Ethnic Minorities Are Increasingly One's That Britain Increasingly Needs ",
+       y = "Predicted Probability") + 
+  theme_minimal() + 
+  scale_fill_viridis_d() +
+  scale_colour_viridis_d()
+```
+
+```{r}
+
+## create racial optimism /pesimism variable ## 
+
+## Higer values more racailly optimistic ## 
+
+## five years ago more abuse off-line ## 
+
+vote_views_race <- vote_views_race %>%
+  mutate(
+    fiveyears_ago_racist_offline_2 = case_when(
+    fiveyears_ago_racist_offline  %in% c("Don't know", "Don‚Äôt know") ~ NA_real_,
+    fiveyears_ago_racist_offline == "More now" ~ 1, 
+    fiveyears_ago_racist_offline == "About the same" ~ 2, 
+    fiveyears_ago_racist_offline == "Less now" ~ 3, 
+    fiveyears_ago_racist_offline == "Has never happened to me" ~3,
+    TRUE ~ as.numeric(fiveyears_ago_racist_offline)
+    ))
+
+
+## five years ago more abuse online ## 
+vote_views_race <- vote_views_race %>%
+  mutate(
+    fiveyears_ago_racist_online_2 = case_when(
+    fiveyears_ago_racist_online  %in% c("Don't know", "Don‚Äôt know") ~ NA_real_,
+    fiveyears_ago_racist_online == "More now" ~ 1, 
+    fiveyears_ago_racist_online == "About the same" ~ 2, 
+    fiveyears_ago_racist_online == "Less now" ~ 3, 
+    fiveyears_ago_racist_online == "Has never happened to me" ~3,
+    TRUE ~ as.numeric(fiveyears_ago_racist_online)
+    ))
+
+## five yeras ago more racist jokes ## 
+
+vote_views_race <- vote_views_race %>%
+  mutate(
+    fiveyears_ago_racist_jokes_2 = case_when(
+    fiveyears_ago_racist_jokes  %in% c("Don't know", "Don‚Äôt know") ~ NA_real_,
+    fiveyears_ago_racist_jokes == "More now" ~ 1, 
+    fiveyears_ago_racist_jokes == "About the same" ~ 2, 
+    fiveyears_ago_racist_jokes == "Less now" ~ 3, 
+    fiveyears_ago_racist_jokes == "Has never happened to me" ~3,
+    TRUE ~ as.numeric(fiveyears_ago_racist_jokes)
+    ))
+
+## five years ago people looked at people like me suspiciosuly # 
+
+vote_views_race <- vote_views_race %>%
+  mutate(
+  fiveyears_ago_suspicious_me_2 = case_when(
+    fiveyears_ago_suspcious_me %in%c("Don't know", "Don‚Äôt know") ~ NA_real_,
+    fiveyears_ago_suspcious_me == "More now" ~ 1, 
+    fiveyears_ago_suspcious_me == "About the same" ~ 2, 
+    fiveyears_ago_suspcious_me == "Less now" ~ 3, 
+    fiveyears_ago_suspcious_me == "Has never happened to me" ~3,
+    TRUE ~ as.numeric(fiveyears_ago_suspcious_me)
+  ))
+
+## five years ago people like me in power 
+vote_views_race <- vote_views_race %>%
+  mutate(
+  fiveyears_ago_like_me_power_2 = case_when(
+    fiveyears_ago_like_me_power %in%c("Don't know", "Don‚Äôt know") ~ NA_real_,
+    fiveyears_ago_like_me_power == "More now" ~ 3, 
+    fiveyears_ago_like_me_power == "About the same" ~ 2, 
+    fiveyears_ago_like_me_power == "Less now" ~ 1, 
+    fiveyears_ago_like_me_power == "Has never happened to me" ~ 1,
+    TRUE ~ as.numeric(fiveyears_ago_like_me_power)
+  ))
+
+## five years ago people like in on tv ## 
+vote_views_race <- vote_views_race %>%
+  mutate(
+  fiveyears_ago_like_me_tv_2 = case_when(
+    fiveyears_ago_like_me_tv %in%c("Don't know", "Don‚Äôt know") ~ NA_real_,
+    fiveyears_ago_like_me_tv == "More now" ~ 3, 
+    fiveyears_ago_like_me_tv == "About the same" ~ 2, 
+    fiveyears_ago_like_me_tv == "Less now" ~ 1, 
+    fiveyears_ago_like_me_tv == "Has never happened to me" ~ 1,
+    TRUE ~ as.numeric(fiveyears_ago_like_me_tv)
+  ))
+
+```
+
+```{r}
+
+##Add fiveyears_ago_2 variables to vote_views_race and vote_views_minority data frames joining using respondnet_id
+# Assuming vote_views_race_white already exists
+
+
+
+vote_views_race_white <- vote_views_race_white %>%
+  left_join(vote_views_race %>% 
+              select(respondent_id, 
+                     fiveyears_ago_racist_jokes_2, 
+                     fiveyears_ago_racist_online_2, 
+                     fiveyears_ago_racist_offline_2, 
+                     fiveyears_ago_suspicious_me_2, 
+                     fiveyears_ago_like_me_power_2), 
+            by = "respondent_id")
+
+
+
+ vote_views_race_white$racial_optimism_index <- (vote_views_race_white$fiveyears_ago_racist_jokes_2 +
+                                                vote_views_race_white$fiveyears_ago_racist_online_2 +
+                                                vote_views_race_white$fiveyears_ago_racist_offline_2 +
+                                                vote_views_race_white$fiveyears_ago_suspicious_me_2 +
+                                                vote_views_race_white$fiveyears_ago_like_me_power_2) / 6
+
+
+
+ vote_views_race_minority <- vote_views_race_minority %>%
+  left_join(vote_views_race %>% 
+              select(respondent_id, 
+                     fiveyears_ago_racist_jokes_2, 
+                     fiveyears_ago_racist_online_2, 
+                     fiveyears_ago_racist_offline_2, 
+                     fiveyears_ago_suspicious_me_2, 
+                     fiveyears_ago_like_me_power_2), 
+            by = "respondent_id")
+
+ 
+ 
+ vote_views_race_minority$racial_optimism_index <- (vote_views_race_minority$fiveyears_ago_racist_jokes_2 +
+                                                vote_views_race_minority$fiveyears_ago_racist_online_2 +
+                                                vote_views_race_minority$fiveyears_ago_racist_offline_2 +
+                                                vote_views_race_minority$fiveyears_ago_suspicious_me_2 +
+                                                vote_views_race_minority$fiveyears_ago_like_me_power_2) / 6
+ 
+ 
+ 
+ 
+
+
+# Remove rows with NAs in the racial_optimism_index variable
+vote_views_race_white_white <- vote_views_race_white[!is.na(vote_views_race_white$racial_optimism_index), ]
+
+
+vote_views_race_white_minority <- vote_views_race_minority[!is.na(vote_views_race_minority$racial_optimism_index), ]
+
+```
+
+```{r}
+## run regression models for racial optimism ## 
+
+## just demogrpahic ## 
+
+
+##  demographic model white voters  ##
+racial_optimism_demographic_model_white <- glm(general_election_tmrw_binary ~ gender_2 + age_2 + education_2 + income_2 + religion_2, data = vote_views_race_white, family = binomial) 
+
+summary(racial_optimism_demographic_model_white)
+
+### democraphics and cultural attitudes white voters 
+
+racial_optimism_demographic_attitudes_model_white <- glm(general_election_tmrw_binary ~ gender_2 + age_2 + education_2 + income_2 + religion_2 + economic_index + culture_index, data = vote_views_race_white, family = binomial)
+
+
+summary(racial_optimism_demographic_attitudes_model_white)
+
+## demographic and non racial attitude variables ## 
+
+racial_optimism_demographic_model_minority <- glm(general_election_tmrw_binary ~  gender_2 + age_2 + education_2 + pol_interest + income_2 + religion + culture_index + economic_index, data = vote_views_race_minority, family = binomial)
+
+
+summary(racial_optimism_demographic_model_minority)
+
+
+racial_optimism_demographic_model_minority <- glm(general_election_tmrw_binary ~ gender_2 + age_2 + education_2 + income_2 + religion, data = vote_views_race_minority, family = binomial) 
+
+summary(racial_optimism_demographic_model_white)
+
+
+## model with racial optimism and cotnrols for white voters ## 
+
+racial_optimism_full_model_white <- glm(general_election_tmrw_binary ~  gender_2 + age_2 + education_2 + pol_interest + income_2 + religion + culture_index + economic_index + racial_optimism_index, data = vote_views_race_white, family = binomial)
+
+summary(racial_optimism_full_model_white)
+
+
+## model with racial optimism and cotnrols for minority  voters ## 
+
+racial_optimism_full_model_minority <- glm(general_election_tmrw_binary ~  gender_2 + age_2 + education_2 + pol_interest + income_2 + religion + culture_index + economic_index + racial_optimism_index, data = vote_views_race_minority, family = binomial)
+
+summary(racial_optimism_full_model_minority)
+
+
+
+```
+
+```{r}
+## predicted probability plot for racial_optimism ## 
+
+ethnic_predict_racial_optimism <- ggpredict(racial_optimism_full_model_minority, terms = "racial_optimism_index", 
+          list = c(numeric= "mean", factor = "mode")) %>%
+  mutate(ethnicity="Minority") # 0 for ethnic
+
+white_predict_racial_optimism <- ggpredict(racial_optimism_full_model_white, terms = "racial_optimism_index", 
+          list = c(numeric= "mean", factor = "mode")) %>%
+  mutate(ethnicity="White")
+
+combined_predict_racial_optimism <- bind_rows(ethnic_predict_racial_optimism, white_predict_racial_optimism)
+
+
+## Predicted Probability Plot for racial optimism ## 
+combined_predict_racial_optimism %>%
+  ggplot(mapping = aes(x = x, y = predicted, color = ethnicity, fill = ethnicity)) +
+  geom_smooth(se = FALSE, size = 1.25) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) + 
+  scale_x_continuous(limits = c(0.75, 2), breaks = seq(0.75, 2, by = 0.25)) +
+  labs(title = "Likelihood of Voting For Left-Wing Party",
+       x = "Racial Optimism Index",
+       y = "Predicted Probability") + 
+  theme_minimal() + 
+  scale_fill_viridis_d() +
+  scale_colour_viridis_d()
+
+```
+
+```{r}
+## Q11 Household Influence Asian  ## 
+
+household_vote_1 <- BAME3 %>%
+  select(ethnicity, family_vote)
+
+household_vote_2 <- household_vote_1 %>%
+   filter(ethnicity %in% c("Asian / Asian British: Other", "Asian / Asian British: Pakistani", "Asian / Asian British: Indian", "Asian / Asian British: Bangladeshi", "Asian or Asian British", "Asian / Asian British: Chinese")) %>%
+  filter(!is.na(family_vote)) %>%
+  filter(!family_vote=="None of these") %>%
+  group_by(ethnicity, family_vote) %>%
+    summarise(count = n()) %>%
+  mutate(percentage = count / sum(count) * 100)
+
+  
+
+ggplot(household_vote_2, aes(x = ethnicity, y = percentage, fill = family_vote)) +
+  geom_bar(stat = "identity") +
+  labs(title = "How Do Members of Your Household Vote",
+       x = "Ethnicity",
+       y = "Percentage") +
+  scale_fill_manual(values = c("Are not able to vote" = "white",
+                                "For a mixture of parties" = "purple",
+                                "Predominantly for Plaid Cymru" = "#3F8428",
+                                "Predominantly for the Scottish National Party (SNP)" = "yellow",
+                                "Do not tend to vote" = "grey",
+                                "Predominantly for the Conservative Party" = "blue",
+                                "Predominantly for the Liberal Democrat" = "orange",
+                                "Predominantly for the Labour Party" = "red")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(fill = guide_legend(title = "Party")) +
+  geom_text(aes(label = paste0(round(percentage), "%")), position = position_stack(vjust = 0.5), size = 3)
+    
+```       
+
+```{r}
+## Household Influence Non Asian ## 
+
+household_vote_1 <- BAME3 %>%
+  select(ethnicity, family_vote)
+
+household_vote_non_asian <- household_vote_1 %>%
+   filter(ethnicity %in% c("Mixed or multiple ethnic groups", "Black / Black British: African", "Black or Black British", "Black / Black British: Caribbean", " Black / Black British: Other", "White", "Arab", "Other ethnic group")) %>%
+  filter(!is.na(family_vote)) %>%
+  filter(!family_vote== "None of these") %>%
+  group_by(ethnicity, family_vote) %>%
+    summarise(count = n()) %>%
+  mutate(percentage = count / sum(count) * 100)
+
+  
+
+ggplot(household_vote_non_asian, aes(x = ethnicity, y = percentage, fill = family_vote)) +
+  geom_bar(stat = "identity") +
+  labs(title = "How Do Members of Your Household Vote",
+       x = "Ethnicity",
+       y = "Percentage") +
+  scale_fill_manual(values = c("Are not able to vote" = "white",
+                                "For a mixture of parties" = "purple",
+                                "Predominantly for Plaid Cymru" = "#3F8428",
+                                "Predominantly for the Scottish National Party (SNP)" = "yellow",
+                                "Do not tend to vote" = "grey",
+                                "Predominantly for the Conservative Party" = "blue",
+                                "Predominantly for the Liberal Democrat" = "orange",
+                                "Predominantly for the Labour Party" = "red")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(fill = guide_legend(title = "Party")) +
+  geom_text(aes(label = paste0(round(percentage), "%")), position = position_stack(vjust = 0.5), size = 3)
+      
+```
+
+```{r}
+
+## Household Influence Non Asian ## 
+
+household_vote_1 <- BAME3 %>%
+  select(ethnicity, family_vote)
+
+household_vote_2 <- household_vote_1 %>%
+   filter(ethnicity %in% c("Mixed or multiple ethnic groups", "Black / Black British: African", "Black or Black British", "Black / Black British: Caribbean", " Black / Black British: Other", "White", "Arab", "Other ethnic group")) %>%
+  filter(!is.na(family_vote)) %>%
+  filter(!family_vote=="None of these") %>%
+  group_by(ethnicity, family_vote) %>%
+    summarise(count = n()) %>%
+  mutate(percentage = count / sum(count) * 100)
+
+  
+
+ggplot(household_vote_2, aes(x = ethnicity, y = percentage, fill = family_vote)) +
+  geom_bar(stat = "identity") +
+  labs(title = "How Do Members of Your Household Vote",
+       x = "Ethnicity",
+       y = "Percentage") +
+  scale_fill_manual(values = c("Are not able to vote" = "white",
+                                "For a mixture of parties" = "purple",
+                                "Predominantly for Plaid Cymru" = "#3F8428",
+                                "Predominantly for the Scottish National Party (SNP)" = "yellow",
+                                "Do not tend to vote" = "grey",
+                                "Predominantly for the Conservative Party" = "blue",
+                                "Predominantly for the Liberal Democrat" = "orange",
+                                "Predominantly for the Labour Party" = "red")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(fill = guide_legend(title = "Party")) +
+  geom_text(aes(label = paste0(round(percentage), "%")), position = position_stack(vjust = 0.5), size = 3)
+
+```  
+
+```{r}
+
+##  Q 13 Create - Party Conversion Scores ##  - for Labour Minority   and white 
+
+vote_views_race_white <- vote_views_race_white %>% 
+  mutate(rating_labour_2 = rating_labour/10)
+
+vote_views_race_white$rating_labour_2 <- as.integer(vote_views_race_white$rating_labour_2)
+
+
+## create binary if will vote Labor## 
+vote_views_race_white <- vote_views_race_white %>% 
+  mutate (vote_labour = if_else(general_election_tmrw == "Labour", 1, 0))
+
+vote_views_race_minority <- vote_views_race_minority %>% 
+  mutate(rating_labour_2 = rating_labour/10)
+
+vote_views_race_minority$rating_labour_2 <- as.integer(vote_views_race_minority$rating_labour_2)
+
+
+## create binary if will vote Labor## 
+vote_views_race_minority <- vote_views_race_minority %>% 
+  mutate (vote_labour = if_else(general_election_tmrw == "Labour", 1, 0))
+
+
+```
+
+```{r}
+## regression model for coversion vote Labour ##
+labour_conversion_rate_white <- glm(vote_labour ~ gender_2 + age_2 + education_2 + pol_interest + income_2 + religion_2 + culture_index + economic_index + rating_labour_2, family = binomial, data = vote_views_race_white, weights = NULL)
+
+
+summary(labour_conversion_rate_white)
+
+labour_conversion_rate_minority <- glm(vote_labour ~ gender_2 + age_2 + education_2 + pol_interest + income_2 + religion_2 + culture_index + economic_index + rating_labour_2, family = binomial, data = vote_views_race_minority, weights = NULL)
+
+
+summary(labour_conversion_rate_minority)
+
+```
+
+```{r}
+## predicted probability plot for labour convers ## 
+
+labour_conversion_minority <- ggpredict(labour_conversion_rate_minority, terms = "rating_labour_2", 
+          list = c(numeric= "mean", factor = "mode")) %>%
+  mutate(ethnicity="Minority") # 0 for ethnic
+
+labour_conversion_white <- ggpredict(labour_conversion_rate_white, terms = "rating_labour_2", 
+          list = c(numeric= "mean", factor = "mode")) %>%
+  mutate(ethnicity="White")
+
+combined_labour_conversion <- bind_rows(labour_conversion_minority, labour_conversion_white)
+
+
+combined_labour_conversion %>%
+  ggplot(mapping = aes(x = x, y = predicted, color = ethnicity, fill = ethnicity)) +
+  geom_smooth(se = FALSE, size = 1.25) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) + 
+  scale_x_continuous(limits = c(0, 10), breaks = seq(0, 10, by = 1)) +
+  expand_limits(x = c(0, 10)) +  # Ensure the full range of values is displayed
+  labs(title = "Likelihood of Voting For Labour",
+       x = "Labour Party Rating",
+       y = "Predicted Probability") + 
+  theme_minimal() + 
+  scale_fill_viridis_d() +
+  scale_colour_viridis_d()
+
+```
+
+
+
+``` {r}
+## 10 Most Important Issue Q57 and 58 ##
+
+mii_1 <- BAME3 %>%
+  select(ethnicity, age, ethnicity, time_uk, important_issue_crime, important_issue_inequality, important_issue_econ, important_issue_nhs, important_issue_environment, important_issue_immigration, important_issue_education, important_issue_education, important_issue_racism, important_issue_pensions, important_issue_first, important_issue_second, important_issue_third) %>%
+  filter(!ethnicity=="White")
+
+
+
+```
+
+```{r}
+## Question 12 
+## PArty Warmth Non -Voters 
+
+
+
+party_warmth_minority <- BAME3 %>% select (ethnicity, rating_conservative, rating_labour, rating_libdem, rating_snp, rating_reform, rating_libdem, general_election_tmrw) 
+
+## collapse all Don't know ## 
+party_warmth_minority_2 <- party_warmth_minority %>%
+filter(!(general_election_tmrw %in% c("Don't know", "Don‚Äôt know", "0", "Other, Don’t know"))) %>%
+  filter(!ethnicity=="White") %>%
+  mutate (general_election_tmrw = case_when(
+      general_election_tmrw == "Scottish National Party (SNP)" ~ "SNP",
+      general_election_tmrw == "Scottish National Party" ~ "SNP",
+      TRUE ~ as.character(general_election_tmrw)))
+
+      
+party_warmth_minority_3 <- party_warmth_minority_2 %>%
+  mutate_at(vars(2:6), ~ ./10)
+
+
+# Remove rows with NA values in specific columns
+party_warmth_minority_3_clean <- party_warmth_minority_3
+
+party_warmth_minority_3_clean$rating_labour[is.na(party_warmth_minority_3_clean$rating_labour)] <- NA
+party_warmth_minority_3_clean$rating_conservative[is.na(party_warmth_minority_3_clean$rating_conservative)] <- NA
+party_warmth_minority_3_clean$rating_reform[is.na(party_warmth_minority_3_clean$rating_reform)] <- NA
+party_warmth_minority_3_clean$rating_snp[is.na(party_warmth_minority_3_clean$rating_snp)] <- NA
+party_warmth_minority_3_clean$rating_libdem[is.na(party_warmth_minority_3_clean$rating_libdem)] <- NA
+
+
+
+# Group by 'general_election_tmrw' and calculate mean ratings for each party
+party_ratings_mean <- party_warmth_minority_3 %>%
+  group_by(general_election_tmrw) %>%
+  summarise(rating_labour_2 = mean(rating_labour, na.rm = TRUE),
+            rating_conservative_2 = mean(rating_conservative, na.rm = TRUE),
+            rating_reform_2 = mean(rating_reform, na.rm = TRUE),
+            rating_libdem_2 = mean(rating_libdem, na.rm = TRUE),
+            rating_snp_2 = mean(rating_snp, na.rm = TRUE))
+
+voters_non_voters_party_rating_mean <- party_ratings_mean %>%
+  mutate(will_vote = if_else(general_election_tmrw == "I would not vote", 0,1))
+
+
+library(dplyr)
+
+# Calculate average ratings for will_vote = 1 and will_vote = 0 separately for each party
+party_ratings_avg <- voters_non_voters_party_rating_mean %>%
+  group_by(will_vote) %>%
+  summarise(avg_rating_labour_1 = mean(ifelse(will_vote == 1, rating_labour_2, NA), na.rm = TRUE),
+            avg_rating_labour_0 = mean(ifelse(will_vote == 0, rating_labour_2, NA), na.rm = TRUE),
+            avg_rating_conservative_1 = mean(ifelse(will_vote == 1, rating_conservative_2, NA), na.rm = TRUE),
+            avg_rating_conservative_0 = mean(ifelse(will_vote == 0, rating_conservative_2, NA), na.rm = TRUE),
+            avg_rating_reform_1 = mean(ifelse(will_vote == 1, rating_reform_2, NA), na.rm = TRUE),
+            avg_rating_reform_0 = mean(ifelse(will_vote == 0, rating_reform_2, NA), na.rm = TRUE),
+            avg_rating_libdem_1 = mean(ifelse(will_vote == 1, rating_libdem_2, NA), na.rm = TRUE),
+            avg_rating_libdem_0 = mean(ifelse(will_vote == 0, rating_libdem_2, NA), na.rm = TRUE),
+            avg_rating_snp_1 = mean(ifelse(will_vote == 1, rating_snp_2, NA), na.rm = TRUE),
+            avg_rating_snp_0 = mean(ifelse(will_vote == 0, rating_snp_2, NA), na.rm = TRUE))
+
+# Print the resulting averages
+print(party_ratings_avg)
+
+
+
+
+%>% 
+  mutate (vote_cnservative = if_else(general_election_tmrw == "Coservatives", 1, 0))
+
+
+
+
+```
+
+```{r}
+##  Q 13 Create - Party Conversion Scores ##  - for Minority   and white 
+
+vote_views_race_white <- vote_views_race_white %>% 
+  mutate(rating_conservative_2 = rating_conservative/10)
+
+vote_views_race_white$rating_conservative_2 <- as.integer(vote_views_race_white$rating_conservative_2)
+
+
+## create binary if will vote Labor## 
+vote_views_race_white <- vote_views_race_white %>% 
+  mutate (vote_cnservative = if_else(general_election_tmrw == "Coservatives", 1, 0))
+
+vote_views_race_minority <- vote_views_race_minority %>% 
+  mutate(rating_conservative_2 = rating_conservative/10)
+
+vote_views_race_minority$rating_conservative_2 <- as.integer(vote_views_race_minority$rating_conservative_2)
+
+
+## create binary if will vote Labor## 
+vote_views_race_minority <- vote_views_race_minority %>% 
+  mutate (vote_conservative = if_else(general_election_tmrw == "Conservatives", 1, 0))
+
+```
+
+```{r}
+## regression model conservatives ## 
+
+## regression model for coversion vote Labour ##
+conservative_conversion_rate_white <- glm(vote_conservative ~ gender_2 + age_2 + education_2 + pol_interest + income_2 + religion_2 + culture_index + economic_index + rating_conservative_2, family = binomial, data = vote_views_race_white, weights = NULL)
+
+
+summary(conservative_conversion_rate_white)
+
+labour_conversion_rate_minority <- glm(vote_labour ~ gender_2 + age_2 + education_2 + pol_interest + income_2 + religion_2 + culture_index + economic_index + rating_labour_2, family = binomial, data = vote_views_race_minority, weights = NULL)
+
+
+summary(labour_conversion_rate_minority)
+```
+
+```{r}
+
+## created predicted probability polot for Conservative conversion ##
+
+## predicted probability plot for labour convers ## 
+
+conservative_conversion_minority <- ggpredict(conservative_conversion_rate_minority, terms = "rating_conservative_2", 
+          list = c(numeric= "mean", factor = "mode")) %>%
+  mutate(ethnicity="Minority") # 0 for ethnic
+
+conservative_conversion_white <- ggpredict(conservative_conversion_rate_white, terms = "rating_conservative_2", 
+          list = c(numeric= "mean", factor = "mode")) %>%
+  mutate(ethnicity="White")
+
+combined_conservative_conversion <- bind_rows(conservative_conversion_minority, conservative_conversion_white)
+
+
+combined_conservative_conversion %>%
+  ggplot(mapping = aes(x = x, y = predicted, color = ethnicity, fill = ethnicity)) +
+  geom_smooth(se = FALSE, size = 1.25) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) + 
+  scale_x_continuous(limits = c(0, 10), breaks = seq(0, 10, by = 1)) +
+  expand_limits(x = c(0, 10)) +  # Ensure the full range of values is displayed
+  labs(title = "Likelihood of Voting For Labour",
+       x = "Conservative Party Rating",
+       y = "Predicted Probability") + 
+  theme_minimal() + 
+  scale_fill_viridis_d() +
+  scale_colour_viridis_d()
+
+
+
+
+
+
+
+
+
+```
+
+```{r}
+## prediccted probability plot conversion rate conservatives ## 
+
+
+
+
+
+```
+
+
+
+
+```{r}
+# 13.  leader scale - sajid javid # 
+leader_scale_javid <- BAME3 %>%
+   dplyr::select(leader_scale_javid_slider, ethnicity) %>%
+   filter(leader_scale_javid_slider<=100) %>%
+  group_by(ethnicity) %>%
+  summarize (avg_javid_rating = mean(leader_scale_javid_slider))
+
+ggplot(leader_scale_javid, aes(x = ethnicity, y = avg_javid_rating)) +
+  geom_bar(stat = "identity", fill = "blue", position = "dodge") +
+  labs(title = "Favourability Rating for Sajid Javid", 
+       x = "Ethnicity", 
+       y =  "Favourability Rating, 0-100") + 
+  theme_minimal() +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+
+## 13. Party Warmth Show conversion ratios for party warmth and vote intention  ## 
+
+vote_views_race <- vote_views_race %>%
+  mutate(rating_labour_2 = rating_labour/10)
+
+```
+
+
+
+
+
+```{r}
+# 14.  leader scale - Boris Johnson # 
+leader_scale_johnson <- BAME3 %>%
+   dplyr::select(leader_scale_johnson_slider, ethnicity) %>%
+   filter(leader_scale_johnson_slider<=100) %>%
+  group_by(ethnicity) %>%
+  summarize (avg_johnson_rating = mean(leader_scale_johnson_slider))
+
+ggplot(leader_scale_johnson, aes(x = ethnicity, y = avg_johnson_rating)) +
+  geom_bar(stat = "identity", fill = "blue", position = "dodge") +
+  labs(title = "Favourability Rating for Boris Johnson", 
+       x = "Ethnicity", 
+       y =  "Favourability Rating, 0-100") + 
+  theme_minimal() +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+# 14.  leader scale - David Lammy  # 
+leader_scale_lammy <- BAME3 %>%
+   dplyr::select(leader_scale_lammy_slider, ethnicity) %>%
+   filter(leader_scale_lammy_slider<=100) %>%
+  group_by(ethnicity) %>%
+  summarize (avg_lammy_rating = mean(leader_scale_lammy_slider))
+
+ggplot(leader_scale_lammy, aes(x = ethnicity, y = avg_lammy_rating)) +
+  geom_bar(stat = "identity", fill = "blue", position = "dodge") +
+  labs(title = "Favourability Rating for David Lammy", 
+       x = "Ethnicity", 
+       y =  "Favourability Rating, 0-100") + 
+  theme_minimal() +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+## leader rating Sadiq Khan ## 
+
+leader_scale_khan <- BAME3 %>%
+   dplyr::select(leader_scale_khan_slider, ethnicity) %>%
+   filter(leader_scale_khan_slider<=100) %>%
+  group_by(ethnicity) %>%
+  summarize (avg_khan_rating = mean(leader_scale_khan_slider))
+
+ggplot(leader_scale_khan, aes(x = ethnicity, y = avg_khan_rating)) +
+  geom_bar(stat = "identity", fill = "blue", position = "dodge") +
+  labs(title = "Favourability Rating for Sadiq Khan", 
+       x = "Ethnicity", 
+       y =  "Favourability Rating, 0-100") + 
+  theme_minimal() +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+## leader rating Priti Patel ## 
+
+leader_scale_patel <- BAME3 %>%
+   dplyr::select(leader_scale_patel_slider, ethnicity) %>%
+   filter(leader_scale_patel_slider<=100) %>%
+  group_by(ethnicity) %>%
+  summarize (avg_patel_rating = mean(leader_scale_patel_slider))
+
+ggplot(leader_scale_patel, aes(x = ethnicity, y = avg_patel_rating)) +
+  geom_bar(stat = "identity", fill = "blue", position = "dodge") +
+  labs(title = "Favourability Rating for Priti Patel", 
+       x = "Ethnicity", 
+       y =  "Favourability Rating, 0-100") + 
+  theme_minimal() +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+## leader rating Keir Starmer ## 
+
+leader_scale_starmer <- BAME3 %>%
+   dplyr::select(leader_scale_starmer_slider, ethnicity) %>%
+   filter(leader_scale_starmer_slider<=100) %>%
+  group_by(ethnicity) %>%
+  summarize (avg_starmer_rating = mean(leader_scale_starmer_slider))
+
+ggplot(leader_scale_starmer, aes(x = ethnicity, y = avg_starmer_rating)) +
+  geom_bar(stat = "identity", fill = "blue", position = "dodge") +
+  labs(title = "Favourability Rating for Keir Starmer", 
+       x = "Ethnicity", 
+       y =  "Favourability Rating, 0-100") + 
+  theme_minimal() +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+## leadership rating Rishi Sunak # 
+
+leader_scale_sunak <- BAME3 %>%
+   dplyr::select(leader_scale_sunak_slider, ethnicity) %>%
+   filter(leader_scale_sunak_slider<=100) %>%
+  group_by(ethnicity) %>%
+  summarize (avg_sunak_rating = mean(leader_scale_sunak_slider))
+
+ggplot(leader_scale_sunak, aes(x = ethnicity, y = avg_sunak_rating)) +
+  geom_bar(stat = "identity", fill = "blue", position = "dodge") +
+  labs(title = "Favourability Rating for Rishi Sunak", 
+       x = "Ethnicity", 
+       y =  "Favourability Rating, 0-100") + 
+  theme_minimal() +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+## leader rating Hamza Yousaf ##
+leader_scale_yousaf <- BAME3 %>%
+   dplyr::select(leader_scale_yousaf_slider, ethnicity) %>%
+   filter(leader_scale_yousaf_slider<=100) %>%
+  group_by(ethnicity) %>%
+  summarize (avg_yousaf_rating = mean(leader_scale_yousaf_slider))
+
+ggplot(leader_scale_yousaf, aes(x = ethnicity, y = avg_yousaf_rating)) +
+  geom_bar(stat = "identity", fill = "blue", position = "dodge") +
+  labs(title = "Favourability Rating for Hamza Yousaf", 
+       x = "Ethnicity", 
+       y =  "Favourability Rating, 0-100") + 
+  theme_minimal() +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+#15 - What qualities do you think are important for a leader ## 
+
+## leader ambitious ## 
+
+leader_ambitious <- BAME3 %>%
+  dplyr::select(ethnicity, leader_ambitious) %>%
+  group_by(ethnicity, leader_ambitious) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum (count) *100)
+
+# filtering to include only "selected" values
+leader_ambitious_selected <- leader_ambitious %>%
+  filter(leader_ambitious == "Selected")
+
+ggplot(leader_ambitious_selected, aes(x = ethnicity, y = proportion, fill = leader_ambitious)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Being Ambitious is an Important Quality/Value for a Leader to Have",
+       x = "Ethnicity",
+       y = "Percentage") +
+  scale_fill_manual(values = c("Selected" = "blue"), name = "Response") +
+  theme_minimal() +
+  theme (legend.position = "none")
+```
+```{r} 
+## leader - confident ## 
+
+leader_confident <- BAME3 %>%
+  dplyr::select(ethnicity, leader_confident) %>%
+  group_by(ethnicity, leader_confident) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum (count) *100)
+
+# filtering to include only "selected" values
+leader_confident_selected <- leader_confident %>%
+  filter(leader_confident == "Selected")
+
+ggplot(leader_confident_selected, aes(x = ethnicity, y = proportion, fill = leader_confident)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Being Confident is an Important Quality/Value for a Leader to Have",
+       x = "Ethnicity",
+       y = "Percentage") +
+  scale_fill_manual(values = c("Selected" = "blue"), name = "Response") +
+  theme_minimal() +
+  theme (legend.position = "none")
+```
+
+```{r}
+## leader - effective ## 
+
+leader_effective <- BAME3 %>%
+  dplyr::select(ethnicity, leader_effective) %>%
+  group_by(ethnicity, leader_effective) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum (count) *100)
+
+# filtering to include only "selected" values
+leader_effective_selected <- leader_effective %>%
+  filter(leader_effective == "Selected")
+
+ggplot(leader_effective_selected, aes(x = ethnicity, y = proportion, fill = leader_effective)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Being Effective is an Important Quality/Value for a Leader to Have",
+       x = "Ethnicity",
+       y = "Percentage") +
+  scale_fill_manual(values = c("Selected" = "blue"), name = "Response") +
+  theme_minimal() +
+  theme (legend.position = "none")
+```
+
+```{r}
+## leader - enthusiastic # 
+
+leader_enthusiastic <- BAME3 %>%
+  dplyr::select(ethnicity, leader_enthusiastic) %>%
+  group_by(ethnicity, leader_enthusiastic) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum (count) *100)
+
+# filtering to include only "selected" values
+leader_enthusiastic_selected <- leader_enthusiastic %>%
+  filter(leader_enthusiastic == "Selected")
+
+ggplot(leader_enthusiastic_selected, aes(x = ethnicity, y = proportion, fill = leader_enthusiastic)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Being Enthusiastic is an Important Quality/Value for a Leader to Have",
+       x = "Ethnicity",
+       y = "Percentage") +
+  scale_fill_manual(values = c("Selected" = "blue"), name = "Response") +
+  theme_minimal() +
+  theme (legend.position = "none")
+```
+
+```{r}
+## leader fair ## 
+leader_fair <- BAME3 %>%
+  dplyr::select(ethnicity, leader_fair) %>%
+  group_by(ethnicity, leader_fair) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum (count) *100)
+
+# filtering to include only "selected" values
+leader_fair_selected <- leader_fair %>%
+  filter(leader_fair == "Selected")
+
+ggplot(leader_fair_selected, aes(x = ethnicity, y = proportion, fill = leader_fair)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Being Fair is an Important Quality/Value for a Leader to Have",
+       x = "Ethnicity",
+       y = "Percentage") +
+  scale_fill_manual(values = c("Selected" = "blue"), name = "Response") +
+  theme_minimal() +
+  theme (legend.position = "none")
+```
+
+```{r}
+## leader _ friendly## 
+
+## leader friendly ## 
+leader_friendly <- BAME3 %>%
+  dplyr::select(ethnicity, leader_friendly) %>%
+  group_by(ethnicity, leader_friendly) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum (count) *100)
+
+# filtering to include only "selected" values
+leader_friendly_selected <- leader_friendly %>%
+  filter(leader_friendly == "Selected")
+
+ggplot(leader_friendly_selected, aes(x = ethnicity, y = proportion, fill = leader_friendly)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Being Friendly is an Important Quality/Value for a Leader to Have",
+       x = "Ethnicity",
+       y = "Percentage") +
+  scale_fill_manual(values = c("Selected" = "blue"), name = "Response") +
+  theme_minimal() +
+  theme (legend.position = "none")
+```
+
+```{r}
+## 15 Vote 2019 Election ## 
+
+## Asian Voters
+
+vote_2019_ethnicity_1 <- BAME3 %>%
+  select(ethnicity, vote_2019) %>%
+  mutate(vote_2019 = case_when(
+    vote_2019 == "Scottish National Party (SNP)" ~ "SNP",
+    vote_2019 == "Scottish National Party" ~ "SNP",
+    vote_2019 == "I did not vote/was not able to"  ~ "I did not vote/was not able to vote",
+    vote_2019 ==  "I did not vote/was not able to vote" ~ "I did not vote/was not able to vote",
+    TRUE ~ as.character(vote_2019)
+  ))
+
+ 
+   vote_2019_asian <- vote_2019_ethnicity %>%
+  filter(ethnicity %in% c("Asian / Asian British: Other", "Asian / Asian British: Pakistani", "Asian / Asian British: Indian", "Asian / Asian British: Bangladeshi", "Asian or Asian British", "Asian / Asian British: Chinese")) %>%
+       filter(!is.na(vote_2019)) %>%
+  filter(!vote_2019 %in% c("Don't know", "Don’t know", "Don‚Äôt know", "Prefer not to say", "Other")) %>%
+  group_by(ethnicity, vote_2019) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum(count) * 100)
+
+
+  ggplot(vote_2019_asian, aes(x = ethnicity, y = proportion, fill = vote_2019)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Party Voted for in 2019 General Election by Ethnic Group",
+       x = "Ethnicity",
+       y = "Percentage") +
+  scale_fill_manual(values = c("The Labour Party" = "red", 
+                                "The Conservative Party" = "blue",
+                                "Green Party" = "#008066", 
+                                "Brexit Party" = "turquoise", 
+                                "Liberal Democrats" = "orange", 
+                                "SNP" = "yellow",
+                                 "Plaid Cymru" = "#3F8428",
+                                 "I did not vote/was not able to vote" = "grey")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(fill = guide_legend(title = "Party")) +
+  geom_text(aes(label = paste0(round(proportion), "%")), position = position_stack(vjust = 0.5), size = 3)
+
+```
+
+```{r}
+#Q15
+
+## non Asian Voters
+
+vote_2019_ethnicity_1 <- BAME3 %>%
+  select(ethnicity, vote_2019) %>%
+  mutate(vote_2019 = case_when(
+    vote_2019 == "Scottish National Party (SNP)" ~ "SNP",
+    vote_2019 == "Scottish National Party" ~ "SNP",
+    vote_2019 == "I did not vote/was not able to"  ~ "I did not vote/was not able to vote",
+    vote_2019 ==  "I did not vote/was not able to vote" ~ "I did not vote/was not able to vote",
+    TRUE ~ as.character(vote_2019)
+  ))
+
+ vote_2019_ethnicity_2 <- vote_2019_ethnicity_1%>%
+   mutate(ethnicity = case_when(
+     ethnicity == "Mixed or multiple" ~ "Mixed multiple or ethnic groups",
+     ethnicity == "Mixed or multiple ethnic groups" ~ "Mixed or multiple ethnic groups",
+     TRUE ~ as.character(ethnicity)
+))
+   
+   
+   
+   vote_2019_non_asian <- vote_2019_ethnicity_2 %>%
+  filter(ethnicity %in% c("Mixed or multiple ethnic groups", "Black / Black British: African", "Black or Black British", "Black / Black British: Caribbean", " Black / Black British: Other", "White", "Arab", "Other ethnic group")) %>%
+       filter(!is.na(vote_2019)) %>%
+  filter(!vote_2019 %in% c("Don't know", "Don’t know", "Don‚Äôt know", "Prefer not to say", "Other")) %>%
+  group_by(ethnicity, vote_2019) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum(count) * 100)
+
+
+  ggplot(vote_2019_non_asian, aes(x = ethnicity, y = proportion, fill = vote_2019)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Party Voted for in 2019 General Election by Ethnic Group",
+       x = "Ethnicity",
+       y = "Percentage") +
+  scale_fill_manual(values = c("The Labour Party" = "red", 
+                                "The Conservative Party" = "blue",
+                                "Green Party" = "#008066", 
+                                "Brexit Party" = "turquoise", 
+                                "Liberal Democrats" = "orange", 
+                                "SNP" = "yellow",
+                                 "Plaid Cymru" = "#3F8428",
+                                 "I did not vote/was not able to vote" = "grey")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(fill = guide_legend(title = "Party")) +
+  geom_text(aes(label = paste0(round(proportion), "%")), position = position_stack(vjust = 0.5), size = 3)
+  
+
+```
+
+```{r}
+## Q15 - Vote in EU ref. Asian voters ## 
+
+#Q15
+
+## non Asian Voters EU REF
+
+vote_eu_ref_ethnicity_1 <- BAME3 %>%
+  select(ethnicity, vote_eu_ref) %>%
+  mutate(eu_ref = case_when(
+    vote_eu_ref == "Scottish National Party (SNP)" ~ "SNP",
+    vote_eu_ref == "Scottish National Party" ~ "SNP",
+    vote_eu_ref == "I did not vote/was not able to"  ~ "I did not vote/was not able to vote",
+    vote_eu_ref ==  "I did not vote/was not able to vote" ~ "I did not vote/was not able to vote",
+    TRUE ~ as.character(vote_eu_ref)
+  ))
+
+ vote_eu_ref_ethnicity_2 <- vote_eu_ref_ethnicity_1%>%
+   mutate(ethnicity = case_when(
+     ethnicity == "Mixed or multiple" ~ "Mixed multiple or ethnic groups",
+     ethnicity == "Mixed or multiple ethnic groups" ~ "Mixed or multiple ethnic groups",
+     TRUE ~ as.character(ethnicity)
+))
+   
+   
+   
+   vote_eu_ref_asian <- vote_eu_ref_ethnicity_2 %>%
+  filter(ethnicity %in% c("Asian / Asian British: Other", "Asian / Asian British: Pakistani", "Asian / Asian British: Indian", "Asian / Asian British: Bangladeshi", "Asian or Asian British", "Asian / Asian British: Chinese")) %>%
+       filter(!is.na(vote_eu_ref)) %>%
+  filter(!vote_eu_ref %in% c("Don't know", "Don’t know", "Don‚Äôt know", "Prefer not to say")) %>%
+  group_by(ethnicity, vote_eu_ref) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum(count) * 100)
+
+
+  ggplot(vote_eu_ref_asian, aes(x = ethnicity, y = proportion, fill = vote_eu_ref)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Vote in 2016 EU Referendum",
+       x = "Ethnicity",
+       y = "Percentage") +
+  scale_fill_manual(values = c("Leave" = "#333399", 
+                                "Remain" = "#fedf00",
+                                 "I did not vote/was not able to vote" = "grey")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(fill = guide_legend(title = "Vote")) +
+  geom_text(aes(label = paste0(round(proportion), "%")), position = position_stack(vjust = 0.5), size = 3)
+```
+
+```{r}
+#Q15
+
+## non Asian Voters EU REF
+
+vote_eu_ref_ethnicity_1 <- BAME3 %>%
+  select(ethnicity, vote_eu_ref) %>%
+  mutate(eu_ref = case_when(
+    vote_eu_ref == "Scottish National Party (SNP)" ~ "SNP",
+    vote_eu_ref == "Scottish National Party" ~ "SNP",
+    vote_eu_ref == "I did not vote/was not able to"  ~ "I did not vote/was not able to vote",
+    vote_eu_ref ==  "I did not vote/was not able to vote" ~ "I did not vote/was not able to vote",
+    TRUE ~ as.character(vote_eu_ref)
+  ))
+
+ vote_eu_ref_ethnicity_2 <- vote_eu_ref_ethnicity_1%>%
+   mutate(ethnicity = case_when(
+     ethnicity == "Mixed or multiple" ~ "Mixed multiple or ethnic groups",
+     ethnicity == "Mixed or multiple ethnic groups" ~ "Mixed or multiple ethnic groups",
+     TRUE ~ as.character(ethnicity)
+))
+   
+   
+   
+   vote_eu_ref_non_asian <- vote_eu_ref_ethnicity_2 %>%
+  filter(ethnicity %in% c("Mixed or multiple ethnic groups", "Black / Black British: African", "Black or Black British", "Black / Black British: Caribbean", " Black / Black British: Other", "White", "Arab", "Other ethnic group")) %>%
+       filter(!is.na(vote_eu_ref)) %>%
+  filter(!vote_eu_ref %in% c("Don't know", "Don’t know", "Don‚Äôt know", "Prefer not to say")) %>%
+  group_by(ethnicity, vote_eu_ref) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum(count) * 100)
+
+
+  ggplot(vote_eu_ref_non_asian, aes(x = ethnicity, y = proportion, fill = vote_eu_ref)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Vote in 2016 EU Referendum",
+       x = "Ethnicity",
+       y = "Percentage") +
+  scale_fill_manual(values = c("Leave" = "#333399", 
+                                "Remain" = "#fedf00",
+                                 "I did not vote/was not able to vote" = "grey")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(fill = guide_legend(title = "Vote")) +
+  geom_text(aes(label = paste0(round(proportion), "%")), position = position_stack(vjust = 0.5), size = 3)
+```
+
+```{r}
+
+# Q15 Vote if election were held tomorrow ## Asian Voters # 
+
+## 15 Vote 2019 Election ## 
+
+## Asian Voters
+
+vote_election_tmrw_ethnicity_1 <- BAME3 %>%
+  select(ethnicity, general_election_tmrw) %>%
+  mutate(general_election_tmrw = case_when(
+    general_election_tmrw == "Scottish National Party (SNP)" ~ "SNP",
+    general_election_tmrw == "Scottish National Party" ~ "SNP",
+    general_election_tmrw == "I did not vote/was not able to"  ~ "I did not vote/was not able to vote",
+    general_election_tmrw ==  "I did not vote/was not able to vote" ~ "I did not vote/was not able to vote",
+    TRUE ~ as.character(general_election_tmrw)
+  ))
+
+ 
+   vote_election_tmrw_asian <- vote_election_tmrw_ethnicity_1 %>%
+  filter(ethnicity %in% c("Asian / Asian British: Other", "Asian / Asian British: Pakistani", "Asian / Asian British: Indian", "Asian / Asian British: Bangladeshi", "Asian or Asian British", "Asian / Asian British: Chinese")) %>%
+       filter(!is.na(general_election_tmrw)) %>%
+  filter(!general_election_tmrw %in% c("Don't know", "Don’t know", "Don‚Äôt know", "Prefer not to say", "Other")) %>%
+  group_by(ethnicity, general_election_tmrw) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum(count) * 100)
+
+
+  ggplot(vote_election_tmrw_asian, aes(x = ethnicity, y = proportion, fill = general_election_tmrw)) +
+  geom_bar(stat = "identity") +
+  labs(title = "If an Election Were Held Tomorrow, Who Would You vote For?",
+       x = "Ethnicity",
+       y = "Percentage") +
+  scale_fill_manual(values = c("The Labour Party" = "red", 
+                                "The Conservative Party" = "blue",
+                                "Green Party" = "#008066", 
+                                "Reform UK" = "turquoise", 
+                                "Liberal Democrats" = "orange", 
+                                "SNP" = "yellow",
+                                 "Plaid Cymru" = "#3F8428",
+                                 "I would not vote" = "grey")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(fill = guide_legend(title = "Party")) +
+  geom_text(aes(label = paste0(round(proportion), "%")), position = position_stack(vjust = 0.5), size = 3)
+```
+
+```{r}
+# Q15 Vote if election were held tomorrow ## Non Asian Voters # 
+
+## 15 Vote 2019 Election ## 
+
+## Non Asian Voters
+
+vote_election_tmrw_ethnicity_1 <- BAME3 %>%
+  select(ethnicity, general_election_tmrw) %>%
+  mutate(general_election_tmrw = case_when(
+    general_election_tmrw == "Scottish National Party (SNP)" ~ "SNP",
+    general_election_tmrw == "Scottish National Party" ~ "SNP",
+    general_election_tmrw == "I did not vote/was not able to"  ~ "I did not vote/was not able to vote",
+    general_election_tmrw ==  "I did not vote/was not able to vote" ~ "I did not vote/was not able to vote",
+    TRUE ~ as.character(general_election_tmrw)
+  ))
+
+ 
+   vote_election_tmrw_non_asian <- vote_election_tmrw_ethnicity_1 %>%
+  filter(ethnicity %in% c("Mixed or multiple ethnic groups", "Black / Black British: African", "Black or Black British", "Black / Black British: Caribbean", " Black / Black British: Other", "White", "Arab", "Other ethnic group")) %>%
+       filter(!is.na(general_election_tmrw)) %>%
+  filter(!general_election_tmrw %in% c("Don't know", "Don’t know", "Don‚Äôt know", "Prefer not to say", "Other")) %>%
+  group_by(ethnicity, general_election_tmrw) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum(count) * 100)
+   
+
+  ggplot(vote_election_tmrw_non_asian, aes(x = ethnicity, y = proportion, fill = general_election_tmrw)) +
+  geom_bar(stat = "identity") +
+  labs(title = "If an Election Were Held Tomorrow, Who Would You vote For?",
+       x = "Ethnicity",
+       y = "Percentage") +
+  scale_fill_manual(values = c("The Labour Party" = "red", 
+                                "The Conservative Party" = "blue",
+                                "Green Party" = "#008066", 
+                                "Reform UK" = "turquoise", 
+                                "Liberal Democrats" = "orange", 
+                                "SNP" = "yellow",
+                                 "Plaid Cymru" = "#3F8428",
+                                 "I would not vote" = "grey")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(fill = guide_legend(title = "Party")) +
+  geom_text(aes(label = paste0(round(proportion), "%")), position = position_stack(vjust = 0.5), size = 3)
+```
+
+```{r}
+## Reason did vote Vote in 2019 ## 
+
+
+no_vote_1 <- BAME3 %>%
+  select(ethnicity, reason_not_vote_2019) %>%
+  mutate(reason_not_vote_2019 = case_when(
+    reason_not_vote_2019 == "Other" ~ "Other",
+    reason_not_vote_2019 == "Other (please specify)" ~ "Other",
+    TRUE ~ as.character(reason_not_vote_2019)
+)
+) %>%
+filter(!is.na(reason_not_vote_2019)) 
+
+
+no_vote_asian <- no_vote_1 %>%
+  filter(ethnicity %in% c("Asian / Asian British: Other", "Asian / Asian British: Pakistani", "Asian / Asian British: Indian", "Asian / Asian British: Bangladeshi", "Asian or Asian British", "Asian / Asian British: Chinese")) %>%
+  group_by(ethnicity, reason_not_vote_2019) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum(count) * 100)
+
+
+
+  ggplot(no_vote_asian, aes(x = ethnicity, y = proportion, fill = reason_not_vote_2019)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Why Did you Not Vote in the 2019 Election?",
+       x = "Ethnicity",
+       y = "Percentage") +
+  scale_fill_manual(values = c("I did not feel that any of the candidates or parties represented me" = "red", 
+                           "I forgot" = "blue",
+                          "I was not eligible to vote" = "orange", 
+                            "My vote would not have made a difference to the outcome" = "yellow", 
+                                "Other" = "grey")) + 
+                      theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(fill = guide_legend(title = "Reason for Not Voting")) +
+  geom_text(aes(label = paste0(round(proportion), "%")), position = position_stack(vjust = 0.5), size = 3)
+   
+
+```
+
+```{r}
+no_vote_1 <- BAME3 %>%
+  select(ethnicity, reason_not_vote_2019) %>%
+  mutate(reason_not_vote_2019 = case_when(
+    reason_not_vote_2019 == "Other" ~ "Other",
+    reason_not_vote_2019 == "Other (please specify)" ~ "Other",
+    TRUE ~ as.character(reason_not_vote_2019)
+)
+) %>%
+filter(!is.na(reason_not_vote_2019)) 
+
+
+no_vote_non_asian <- no_vote_1 %>%
+  filter(ethnicity %in% c("Mixed or multiple ethnic groups", "Black / Black British: African", "Black or Black British", "Black / Black British: Caribbean", " Black / Black British: Other", "White", "Arab", "Other ethnic group")) %>%
+  group_by(ethnicity, reason_not_vote_2019) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum(count) * 100)
+
+
+
+  ggplot(no_vote_non_asian, aes(x = ethnicity, y = proportion, fill = reason_not_vote_2019)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Why Did you Not Vote in the 2019 Election?",
+       x = "Ethnicity",
+       y = "Percentage") +
+  scale_fill_manual(values = c("I did not feel that any of the candidates or parties represented me" = "red", 
+                           "I forgot" = "blue",
+                          "I was not eligible to vote" = "orange", 
+                            "My vote would not have made a difference to the outcome" = "yellow", 
+                                "Other" = "grey")) + 
+                      theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(fill = guide_legend(title = "Reason for Not Voting")) +
+  geom_text(aes(label = paste0(round(proportion), "%")), position = position_stack(vjust = 0.5), size = 3)
+```   
+
+  
